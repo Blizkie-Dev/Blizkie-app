@@ -35,13 +35,6 @@ router.post('/:chatId/messages', (req, res, next) => {
     const attachment = hasAttachment ? { attachment_url, attachment_type, attachment_name } : {};
     const msg = saveMessage(req.params.chatId, req.userId, hasText ? text.trim() : '', attachment);
 
-    // Broadcast via socket
-    const io = req.app.get('io');
-    if (io) {
-      io.to(`chat:${req.params.chatId}`).emit('new-message', msg);
-    }
-
-    // Push notifications to offline members
     const db = getDb();
     const members = db
       .prepare(
@@ -54,6 +47,16 @@ router.post('/:chatId/messages', (req, res, next) => {
     const sender = members.find((m) => m.id === req.userId);
     const senderName = sender?.display_name || 'Новое сообщение';
 
+    // Broadcast via socket — emit to each member's personal room so new
+    // chats (where the other user hasn't joined the chat room yet) also work
+    const io = req.app.get('io');
+    if (io) {
+      for (const member of members) {
+        io.to(`user:${member.id}`).emit('new-message', msg);
+      }
+    }
+
+    // Push notifications to offline members only
     for (const member of members) {
       if (member.id === req.userId) continue;
       if (onlineUsers.has(member.id)) continue;

@@ -9,10 +9,10 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Colors } from '../../constants/colors';
-import { getChats } from '../../api/chatsApi';
+import { getChats, getChatById } from '../../api/chatsApi';
 import { useChatsStore, useAuthStore } from '../../store';
 import ChatListItem from '../../components/ChatListItem';
-import { getSocket } from '../../socket/socketClient';
+import { getSocket, joinChat } from '../../socket/socketClient';
 import { Message } from '../../api/chatsApi';
 
 interface Props {
@@ -20,7 +20,7 @@ interface Props {
 }
 
 export default function ChatsListScreen({ navigation }: Props) {
-  const { chats, setChats, updateLastMessage, incrementUnread, activeChatId } = useChatsStore();
+  const { chats, setChats, updateLastMessage, incrementUnread, upsertChat, activeChatId } = useChatsStore();
   const user = useAuthStore((s) => s.user);
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
@@ -46,7 +46,20 @@ export default function ChatsListScreen({ navigation }: Props) {
     const socket = getSocket();
     if (!socket) return;
 
-    const handler = (message: Message) => {
+    const handler = async (message: Message) => {
+      const chatKnown = useChatsStore.getState().chats.some((c) => c.id === message.chat_id);
+      if (!chatKnown) {
+        // New chat from another user — fetch full chat and add to list
+        try {
+          const chat = await getChatById(message.chat_id);
+          upsertChat({ ...chat, last_message: message, unread_count: 1 });
+          joinChat(message.chat_id);
+        } catch {
+          // If fetch fails just reload all chats
+          loadChats();
+        }
+        return;
+      }
       if (message.chat_id !== activeChatId) {
         incrementUnread(message.chat_id);
       }

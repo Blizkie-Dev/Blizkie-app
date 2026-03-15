@@ -49,6 +49,9 @@ function initSocket(httpServer) {
       .prepare('UPDATE users SET last_seen_at = ? WHERE id = ?')
       .run([Date.now(), userId]);
 
+    // Join personal room for direct delivery (new chats, etc.)
+    socket.join(`user:${userId}`);
+
     // Join all user's chat rooms
     const chats = getUserChats(userId);
     chats.forEach((chat) => {

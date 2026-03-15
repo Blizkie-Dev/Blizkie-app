@@ -77,6 +77,32 @@ export const useChatsStore = create<ChatsState>((set) => ({
     })),
 }));
 
+// ─── Online Users Slice ────────────────────────────────────────────────────
+
+interface OnlineState {
+  onlineUserIds: Set<string>;
+  setUserOnline: (userId: string) => void;
+  setUserOffline: (userId: string) => void;
+  isOnline: (userId: string) => boolean;
+}
+
+export const useOnlineStore = create<OnlineState>((set, get) => ({
+  onlineUserIds: new Set(),
+  setUserOnline: (userId) =>
+    set((state) => {
+      const next = new Set(state.onlineUserIds);
+      next.add(userId);
+      return { onlineUserIds: next };
+    }),
+  setUserOffline: (userId) =>
+    set((state) => {
+      const next = new Set(state.onlineUserIds);
+      next.delete(userId);
+      return { onlineUserIds: next };
+    }),
+  isOnline: (userId) => get().onlineUserIds.has(userId),
+}));
+
 // ─── Messages Slice ────────────────────────────────────────────────────────
 
 interface MessagesState {

@@ -3,9 +3,9 @@ import { ActivityIndicator, View } from 'react-native';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import AuthNavigator from './AuthNavigator';
 import MainNavigator from './MainNavigator';
-import { useAuthStore } from '../store';
+import { useAuthStore, useOnlineStore } from '../store';
 import { getToken, getSavedUser } from '../utils/storage';
-import { connectSocket } from '../socket/socketClient';
+import { connectSocket, getSocket } from '../socket/socketClient';
 import { Colors } from '../constants/colors';
 
 interface Props {
@@ -36,10 +36,32 @@ export default function RootNavigator({ navigationRef }: Props) {
 
   // Connect socket when auth state changes to authenticated
   const token = useAuthStore((s) => s.token);
+  const { setUserOnline, setUserOffline } = useOnlineStore();
+
   useEffect(() => {
     if (isAuthenticated && token) {
       connectSocket(token);
     }
+  }, [isAuthenticated, token]);
+
+  // Global online/offline listeners — registered right after socket is created
+  // so we catch the initial user-online events the server emits on connect
+  useEffect(() => {
+    if (!isAuthenticated || !token) return;
+
+    const socket = getSocket();
+    if (!socket) return;
+
+    const onOnline = ({ userId }: { userId: string }) => setUserOnline(userId);
+    const onOffline = ({ userId }: { userId: string }) => setUserOffline(userId);
+
+    socket.on('user-online', onOnline);
+    socket.on('user-offline', onOffline);
+
+    return () => {
+      socket.off('user-online', onOnline);
+      socket.off('user-offline', onOffline);
+    };
   }, [isAuthenticated, token]);
 
   if (bootstrapping) {

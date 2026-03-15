@@ -18,7 +18,7 @@ import { useHeaderHeight } from '@react-navigation/elements';
 import { Colors } from '../../constants/colors';
 import { getMessages, sendMessage, markChatAsRead, uploadFile, reactToMessage } from '../../api/chatsApi';
 import { Message, Chat } from '../../api/chatsApi';
-import { useMessagesStore, useChatsStore, useAuthStore } from '../../store';
+import { useMessagesStore, useChatsStore, useAuthStore, useOnlineStore } from '../../store';
 import MessageBubble from '../../components/MessageBubble';
 import TypingIndicator from '../../components/TypingIndicator';
 import Avatar from '../../components/Avatar';
@@ -58,7 +58,6 @@ export default function ChatScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
-  const [partnerIsOnline, setPartnerIsOnline] = useState(false);
   const [pendingMedia, setPendingMedia] = useState<PendingMedia | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -66,6 +65,8 @@ export default function ChatScreen({ navigation, route }: Props) {
 
   const otherMember = chat.members.find((m) => m.id !== user.id);
   const chatName = otherMember?.display_name || otherMember?.username || 'Чат';
+  const onlineUserIds = useOnlineStore((s) => s.onlineUserIds);
+  const partnerIsOnline = otherMember ? onlineUserIds.has(otherMember.id) : false;
 
   useEffect(() => {
     navigation.setOptions({
@@ -166,25 +167,11 @@ export default function ChatScreen({ navigation, route }: Props) {
       }
     };
 
-    const onUserOnline = ({ userId }: { userId: string }) => {
-      if (otherMember && userId === otherMember.id) {
-        setPartnerIsOnline(true);
-      }
-    };
-
-    const onUserOffline = ({ userId }: { userId: string }) => {
-      if (otherMember && userId === otherMember.id) {
-        setPartnerIsOnline(false);
-      }
-    };
-
     socket.on('new-message', onNewMessage);
     socket.on('user-typing', onTyping);
     socket.on('user-stopped-typing', onStopTyping);
     socket.on('chat-read', onChatRead);
     socket.on('message-reaction', onReaction);
-    socket.on('user-online', onUserOnline);
-    socket.on('user-offline', onUserOffline);
 
     return () => {
       socket.off('new-message', onNewMessage);
@@ -192,8 +179,6 @@ export default function ChatScreen({ navigation, route }: Props) {
       socket.off('user-stopped-typing', onStopTyping);
       socket.off('chat-read', onChatRead);
       socket.off('message-reaction', onReaction);
-      socket.off('user-online', onUserOnline);
-      socket.off('user-offline', onUserOffline);
     };
   }, [chat.id]);
 

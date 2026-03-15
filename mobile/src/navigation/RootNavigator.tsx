@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import AuthNavigator from './AuthNavigator';
 import MainNavigator from './MainNavigator';
 import { useAuthStore } from '../store';
@@ -8,7 +8,11 @@ import { getToken, getSavedUser } from '../utils/storage';
 import { connectSocket } from '../socket/socketClient';
 import { Colors } from '../constants/colors';
 
-export default function RootNavigator() {
+interface Props {
+  navigationRef?: React.RefObject<NavigationContainerRef<any>>;
+}
+
+export default function RootNavigator({ navigationRef }: Props) {
   const { isAuthenticated, setAuth } = useAuthStore();
   const [bootstrapping, setBootstrapping] = useState(true);
 
@@ -47,7 +51,7 @@ export default function RootNavigator() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       {isAuthenticated ? <MainNavigator /> : <AuthNavigator />}
     </NavigationContainer>
   );

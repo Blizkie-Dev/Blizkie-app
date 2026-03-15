@@ -2,7 +2,7 @@ const { Expo } = require('expo-server-sdk');
 
 const expo = new Expo();
 
-async function sendMessagePush(pushToken, senderName, messageText) {
+async function sendMessagePush(pushToken, senderName, messageText, data = {}) {
   if (!pushToken || !Expo.isExpoPushToken(pushToken)) return;
 
   const body =
@@ -17,7 +17,7 @@ async function sendMessagePush(pushToken, senderName, messageText) {
         sound: 'default',
         title: senderName || 'Новое сообщение',
         body,
-        data: {},
+        data,
       },
     ]);
     for (const chunk of chunks) {

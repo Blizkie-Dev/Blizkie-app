@@ -62,7 +62,10 @@ router.post('/:chatId/messages', (req, res, next) => {
       if (onlineUsers.has(member.id)) continue;
       if (member.push_token) {
         const pushText = msg.text || (msg.attachment_type === 'image' ? '📷 Фото' : '📎 Файл');
-        sendMessagePush(member.push_token, senderName, pushText).catch(() => {});
+        sendMessagePush(member.push_token, senderName, pushText, {
+          chatId: req.params.chatId,
+          senderId: req.userId,
+        }).catch(() => {});
       }
     }
 

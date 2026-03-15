@@ -4,16 +4,20 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
 import { formatMessageTime } from '../utils/formatTime';
 import { Message } from '../api/chatsApi';
+import { User } from '../api/authApi';
 import { API_BASE_URL } from '../constants/config';
 import MediaViewer from './MediaViewer';
+import Avatar from './Avatar';
 
 const SCREEN_W = Dimensions.get('window').width;
+const REACTION_H = 20;
 
 interface MessageBubbleProps {
   message: Message;
   isMine: boolean;
   partnerLastReadAt?: number;
   currentUserId?: string;
+  chatMembers?: User[];
   onReact?: (messageId: string) => void;
 }
 
@@ -33,13 +37,14 @@ export default function MessageBubble({
   isMine,
   partnerLastReadAt = 0,
   currentUserId,
+  chatMembers,
   onReact,
 }: MessageBubbleProps) {
   const [viewerOpen, setViewerOpen] = useState(false);
   const lastTapRef = useRef(0);
   const isRead = isMine && partnerLastReadAt >= message.created_at;
   const likedBy = message.liked_by || [];
-  const iLiked = currentUserId ? likedBy.includes(currentUserId) : false;
+  const hasReaction = likedBy.length > 0;
 
   function handleTap() {
     const now = Date.now();
@@ -59,73 +64,83 @@ export default function MessageBubble({
   return (
     <>
       <View style={[styles.wrapper, isMine ? styles.wrapperRight : styles.wrapperLeft]}>
-        <View>
-        <TouchableOpacity activeOpacity={1} onPress={handleTap}>
-        <View style={[styles.bubble, isMine ? styles.bubbleSent : styles.bubbleReceived]}>
+        {/* Extra bottom margin so the reaction badge doesn't overlap next bubble */}
+        <View style={hasReaction ? styles.bubbleWithReaction : undefined}>
+          <TouchableOpacity activeOpacity={1} onPress={handleTap}>
+            <View style={[styles.bubble, isMine ? styles.bubbleSent : styles.bubbleReceived]}>
 
-          {/* Image attachment */}
-          {hasImage && mediaUri && (
-            <TouchableOpacity activeOpacity={0.95} onPress={() => setViewerOpen(true)}>
-              <Image
-                source={{ uri: mediaUri }}
-                style={styles.attachedImage}
-                resizeMode="cover"
-              />
-            </TouchableOpacity>
-          )}
+              {/* Image attachment */}
+              {hasImage && mediaUri && (
+                <TouchableOpacity activeOpacity={0.95} onPress={() => setViewerOpen(true)}>
+                  <Image
+                    source={{ uri: mediaUri }}
+                    style={styles.attachedImage}
+                    resizeMode="cover"
+                  />
+                </TouchableOpacity>
+              )}
 
-          {/* Video attachment */}
-          {hasVideo && mediaUri && (
-            <TouchableOpacity
-              style={styles.videoThumb}
-              activeOpacity={0.85}
-              onPress={() => setViewerOpen(true)}
-            >
-              <View style={styles.videoPlayBtn}>
-                <Ionicons name="play-circle" size={52} color="rgba(255,255,255,0.9)" />
+              {/* Video attachment */}
+              {hasVideo && mediaUri && (
+                <TouchableOpacity
+                  style={styles.videoThumb}
+                  activeOpacity={0.85}
+                  onPress={() => setViewerOpen(true)}
+                >
+                  <View style={styles.videoPlayBtn}>
+                    <Ionicons name="play-circle" size={52} color="rgba(255,255,255,0.9)" />
+                  </View>
+                  <Text style={styles.videoLabel}>Видео</Text>
+                </TouchableOpacity>
+              )}
+
+              {/* File attachment */}
+              {hasFile && (
+                <View style={[styles.fileRow, isMine ? styles.fileRowSent : styles.fileRowReceived]}>
+                  <Ionicons name="document-outline" size={22} color={isMine ? '#fff' : Colors.primary} />
+                  <Text
+                    style={[styles.fileName, isMine ? styles.fileNameSent : styles.fileNameReceived]}
+                    numberOfLines={1}
+                  >
+                    {message.attachment_name || 'Файл'}
+                  </Text>
+                </View>
+              )}
+
+              {/* Text */}
+              {!!message.text && (
+                <Text style={[styles.text, isMine ? styles.textSent : styles.textReceived]}>
+                  {message.text}
+                </Text>
+              )}
+
+              {/* Footer */}
+              <View style={[styles.footer, (hasImage || hasVideo) && !message.text && styles.footerOverMedia]}>
+                <Text style={[styles.time, isMine ? styles.timeSent : styles.timeReceived]}>
+                  {formatMessageTime(message.created_at)}
+                </Text>
+                {isMine && <ReadTick isRead={isRead} />}
               </View>
-              <Text style={styles.videoLabel}>Видео</Text>
-            </TouchableOpacity>
-          )}
+            </View>
+          </TouchableOpacity>
 
-          {/* File attachment */}
-          {hasFile && (
-            <View style={[styles.fileRow, isMine ? styles.fileRowSent : styles.fileRowReceived]}>
-              <Ionicons name="document-outline" size={22} color={isMine ? '#fff' : Colors.primary} />
-              <Text
-                style={[styles.fileName, isMine ? styles.fileNameSent : styles.fileNameReceived]}
-                numberOfLines={1}
-              >
-                {message.attachment_name || 'Файл'}
-              </Text>
+          {/* Heart reaction badge — sits on the bottom edge of the bubble */}
+          {hasReaction && (
+            <View style={[styles.reactionBadge, isMine ? styles.reactionBadgeRight : styles.reactionBadgeLeft]}>
+              <Ionicons name="heart" size={13} color="#E8344E" />
+              {likedBy.map((uid) => {
+                const member = chatMembers?.find((m) => m.id === uid);
+                return (
+                  <Avatar
+                    key={uid}
+                    uri={member?.avatar_url}
+                    name={member?.display_name || member?.username || '?'}
+                    size={16}
+                  />
+                );
+              })}
             </View>
           )}
-
-          {/* Text */}
-          {!!message.text && (
-            <Text style={[styles.text, isMine ? styles.textSent : styles.textReceived]}>
-              {message.text}
-            </Text>
-          )}
-
-          {/* Footer */}
-          <View style={[styles.footer, (hasImage || hasVideo) && !message.text && styles.footerOverMedia]}>
-            <Text style={[styles.time, isMine ? styles.timeSent : styles.timeReceived]}>
-              {formatMessageTime(message.created_at)}
-            </Text>
-            {isMine && <ReadTick isRead={isRead} />}
-          </View>
-        </View>
-        </TouchableOpacity>
-
-        {/* Heart reaction badge */}
-        {likedBy.length > 0 && (
-          <View style={[styles.reactionBadge, isMine ? styles.reactionBadgeRight : styles.reactionBadgeLeft]}>
-            <Text style={styles.reactionText}>
-              {iLiked ? '❤️' : '🤍'}{likedBy.length > 1 ? ` ${likedBy.length}` : ''}
-            </Text>
-          </View>
-        )}
         </View>
       </View>
 
@@ -150,6 +165,9 @@ const styles = StyleSheet.create({
   },
   wrapperRight: { justifyContent: 'flex-end' },
   wrapperLeft: { justifyContent: 'flex-start' },
+  bubbleWithReaction: {
+    marginBottom: REACTION_H / 2 + 2,
+  },
   bubble: {
     maxWidth: SCREEN_W * 0.75,
     borderRadius: 16,
@@ -227,17 +245,11 @@ const styles = StyleSheet.create({
   timeReceived: { color: Colors.textSecondary },
   reactionBadge: {
     position: 'absolute',
-    bottom: -10,
-    backgroundColor: Colors.background,
-    borderRadius: 10,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    bottom: -(REACTION_H / 2),
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 3,
   },
-  reactionBadgeRight: { right: 6 },
-  reactionBadgeLeft: { left: 6 },
-  reactionText: { fontSize: 12 },
+  reactionBadgeRight: { right: 8 },
+  reactionBadgeLeft: { left: 8 },
 });

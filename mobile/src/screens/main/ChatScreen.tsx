@@ -313,6 +313,7 @@ export default function ChatScreen({ navigation, route }: Props) {
             isMine={item.sender_id === user.id}
             partnerLastReadAt={partnerLastReadAt}
             currentUserId={user.id}
+            chatMembers={chat.members}
             onReact={handleReact}
           />
         )}

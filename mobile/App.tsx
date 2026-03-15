@@ -8,6 +8,22 @@ import { setupNotifications } from './src/utils/notifications';
 import { useAuthStore } from './src/store';
 import { getChatById } from './src/api/chatsApi';
 
+async function navigateToChat(
+  navigationRef: React.RefObject<NavigationContainerRef<any>>,
+  chatId: string
+) {
+  if (!navigationRef.current) return;
+  try {
+    const chat = await getChatById(chatId);
+    navigationRef.current.navigate('Chats', {
+      screen: 'Chat',
+      params: { chat },
+    });
+  } catch (err) {
+    console.warn('[Notifications] Failed to navigate to chat:', err);
+  }
+}
+
 export default function App() {
   const token = useAuthStore((s) => s.token);
   const listenerRef = useRef<Notifications.Subscription | null>(null);
@@ -18,20 +34,17 @@ export default function App() {
 
     setupNotifications();
 
-    listenerRef.current = Notifications.addNotificationResponseReceivedListener(
-      async (response) => {
-        const chatId = response.notification.request.content.data?.chatId as string | undefined;
-        if (!chatId || !navigationRef.current) return;
+    // Case 1: app was killed and launched by tapping a notification
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      const chatId = response?.notification.request.content.data?.chatId as string | undefined;
+      if (chatId) navigateToChat(navigationRef, chatId);
+    });
 
-        try {
-          const chat = await getChatById(chatId);
-          navigationRef.current.navigate('Chats', {
-            screen: 'Chat',
-            params: { chat },
-          });
-        } catch (err) {
-          console.warn('[Notifications] Failed to navigate to chat:', err);
-        }
+    // Case 2: app is in foreground/background and user taps notification
+    listenerRef.current = Notifications.addNotificationResponseReceivedListener(
+      (response) => {
+        const chatId = response.notification.request.content.data?.chatId as string | undefined;
+        if (chatId) navigateToChat(navigationRef, chatId);
       }
     );
 

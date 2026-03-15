@@ -16,7 +16,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Colors } from '../../constants/colors';
-import { getMessages, sendMessage, markChatAsRead, uploadFile } from '../../api/chatsApi';
+import { getMessages, sendMessage, markChatAsRead, uploadFile, reactToMessage } from '../../api/chatsApi';
 import { Message, Chat } from '../../api/chatsApi';
 import { useMessagesStore, useChatsStore, useAuthStore } from '../../store';
 import MessageBubble from '../../components/MessageBubble';
@@ -48,7 +48,7 @@ export default function ChatScreen({ navigation, route }: Props) {
   const { chat } = route.params;
   const headerHeight = useHeaderHeight();
   const user = useAuthStore((s) => s.user)!;
-  const { messagesByChatId, setMessages, addMessage } = useMessagesStore();
+  const { messagesByChatId, setMessages, addMessage, updateMessageReaction } = useMessagesStore();
   const { updateLastMessage, markChatRead, setActiveChatId, setPartnerReadAt, chats } = useChatsStore();
   const currentChat = chats.find((c) => c.id === chat.id);
   const partnerLastReadAt = currentChat?.partner_last_read_at || 0;
@@ -58,6 +58,7 @@ export default function ChatScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const [partnerIsOnline, setPartnerIsOnline] = useState(false);
   const [pendingMedia, setPendingMedia] = useState<PendingMedia | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -73,16 +74,18 @@ export default function ChatScreen({ navigation, route }: Props) {
           <Avatar uri={otherMember?.avatar_url} name={chatName} size={36} />
           <View style={styles.headerInfo}>
             <Text style={styles.headerName}>{chatName}</Text>
-            <Text style={styles.headerStatus}>
+            <Text style={[styles.headerStatus, partnerIsOnline && styles.headerStatusOnline]}>
               {otherMember
-                ? formatLastSeen(otherMember.last_seen_at || 0)
+                ? partnerIsOnline
+                  ? 'онлайн'
+                  : formatLastSeen(otherMember.last_seen_at || 0)
                 : ''}
             </Text>
           </View>
         </TouchableOpacity>
       ),
     });
-  }, [chatName, otherMember]);
+  }, [chatName, otherMember, partnerIsOnline]);
 
   // Track this as the active chat (for unread logic + push suppression)
   // Clear when app is backgrounded so push notifications still arrive
@@ -157,16 +160,40 @@ export default function ChatScreen({ navigation, route }: Props) {
       }
     };
 
+    const onReaction = ({ messageId, chatId: cId, liked_by }: { messageId: string; chatId: string; liked_by: string[] }) => {
+      if (cId === chat.id) {
+        updateMessageReaction(chat.id, messageId, liked_by);
+      }
+    };
+
+    const onUserOnline = ({ userId }: { userId: string }) => {
+      if (otherMember && userId === otherMember.id) {
+        setPartnerIsOnline(true);
+      }
+    };
+
+    const onUserOffline = ({ userId }: { userId: string }) => {
+      if (otherMember && userId === otherMember.id) {
+        setPartnerIsOnline(false);
+      }
+    };
+
     socket.on('new-message', onNewMessage);
     socket.on('user-typing', onTyping);
     socket.on('user-stopped-typing', onStopTyping);
     socket.on('chat-read', onChatRead);
+    socket.on('message-reaction', onReaction);
+    socket.on('user-online', onUserOnline);
+    socket.on('user-offline', onUserOffline);
 
     return () => {
       socket.off('new-message', onNewMessage);
       socket.off('user-typing', onTyping);
       socket.off('user-stopped-typing', onStopTyping);
       socket.off('chat-read', onChatRead);
+      socket.off('message-reaction', onReaction);
+      socket.off('user-online', onUserOnline);
+      socket.off('user-offline', onUserOffline);
     };
   }, [chat.id]);
 
@@ -266,6 +293,15 @@ export default function ChatScreen({ navigation, route }: Props) {
     setPendingMedia({ uri: asset.uri, mimeType, filename, isVideo });
   }
 
+  async function handleReact(messageId: string) {
+    try {
+      const { liked_by } = await reactToMessage(chat.id, messageId);
+      updateMessageReaction(chat.id, messageId, liked_by);
+    } catch (err) {
+      console.warn('[Reaction] Failed:', err);
+    }
+  }
+
   const canSend = !sending && (!!inputText.trim() || !!pendingMedia);
 
   if (loading) {
@@ -291,6 +327,8 @@ export default function ChatScreen({ navigation, route }: Props) {
             message={item}
             isMine={item.sender_id === user.id}
             partnerLastReadAt={partnerLastReadAt}
+            currentUserId={user.id}
+            onReact={handleReact}
           />
         )}
         ListEmptyComponent={
@@ -392,6 +430,9 @@ const styles = StyleSheet.create({
   headerStatus: {
     fontSize: 12,
     color: Colors.textSecondary,
+  },
+  headerStatusOnline: {
+    color: Colors.primary,
   },
   messagesList: {
     paddingVertical: 12,

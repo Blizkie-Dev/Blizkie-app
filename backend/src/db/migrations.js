@@ -86,6 +86,11 @@ function runMigrations() {
     try { db.exec(col); } catch { /* already exists */ }
   }
 
+  // Add liked_by for heart reactions
+  try {
+    db.exec("ALTER TABLE messages ADD COLUMN liked_by TEXT NOT NULL DEFAULT '[]'");
+  } catch { /* already exists */ }
+
   console.log('[DB] Migrations complete');
 }
 

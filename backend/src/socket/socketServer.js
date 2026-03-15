@@ -47,6 +47,9 @@ function initSocket(httpServer) {
     onlineUsers.add(userId);
     console.log(`[Socket] Connected: ${userId}`);
 
+    // Load user's chats once — reused in connect and disconnect handlers
+    const userChats = getUserChats(userId);
+
     // Update last seen
     getDb()
       .prepare('UPDATE users SET last_seen_at = ? WHERE id = ?')
@@ -55,10 +58,21 @@ function initSocket(httpServer) {
     // Join personal room for direct delivery (new chats, etc.)
     socket.join(`user:${userId}`);
 
-    // Join all user's chat rooms
-    const chats = getUserChats(userId);
-    chats.forEach((chat) => {
+    // Join all user's chat rooms and notify others this user is online
+    userChats.forEach((chat) => {
       socket.join(`chat:${chat.id}`);
+      socket.to(`chat:${chat.id}`).emit('user-online', { userId });
+    });
+
+    // Inform the connecting user about which of their contacts are already online
+    const seenMembers = new Set();
+    userChats.forEach((chat) => {
+      chat.members.forEach((m) => {
+        if (m.id !== userId && !seenMembers.has(m.id) && onlineUsers.has(m.id)) {
+          socket.emit('user-online', { userId: m.id });
+          seenMembers.add(m.id);
+        }
+      });
     });
 
     // Join a specific chat room (after creating a new chat)
@@ -86,9 +100,14 @@ function initSocket(httpServer) {
     socket.on('disconnect', () => {
       onlineUsers.delete(userId);
       userActiveChat.delete(userId);
+      const lastSeenAt = Date.now();
       getDb()
         .prepare('UPDATE users SET last_seen_at = ? WHERE id = ?')
-        .run([Date.now(), userId]);
+        .run([lastSeenAt, userId]);
+      // Notify chats that this user went offline
+      userChats.forEach((chat) => {
+        io.to(`chat:${chat.id}`).emit('user-offline', { userId, last_seen_at: lastSeenAt });
+      });
       console.log(`[Socket] Disconnected: ${userId}`);
     });
   });

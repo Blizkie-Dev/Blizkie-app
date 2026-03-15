@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { View, Text, Image, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/colors';
@@ -13,6 +13,8 @@ interface MessageBubbleProps {
   message: Message;
   isMine: boolean;
   partnerLastReadAt?: number;
+  currentUserId?: string;
+  onReact?: (messageId: string) => void;
 }
 
 function ReadTick({ isRead }: { isRead: boolean }) {
@@ -26,9 +28,26 @@ function ReadTick({ isRead }: { isRead: boolean }) {
   );
 }
 
-export default function MessageBubble({ message, isMine, partnerLastReadAt = 0 }: MessageBubbleProps) {
+export default function MessageBubble({
+  message,
+  isMine,
+  partnerLastReadAt = 0,
+  currentUserId,
+  onReact,
+}: MessageBubbleProps) {
   const [viewerOpen, setViewerOpen] = useState(false);
+  const lastTapRef = useRef(0);
   const isRead = isMine && partnerLastReadAt >= message.created_at;
+  const likedBy = message.liked_by || [];
+  const iLiked = currentUserId ? likedBy.includes(currentUserId) : false;
+
+  function handleTap() {
+    const now = Date.now();
+    if (now - lastTapRef.current < 300) {
+      onReact?.(message.id);
+    }
+    lastTapRef.current = now;
+  }
 
   const hasImage = message.attachment_type === 'image' && message.attachment_url;
   const hasVideo = message.attachment_type === 'video' && message.attachment_url;
@@ -40,6 +59,8 @@ export default function MessageBubble({ message, isMine, partnerLastReadAt = 0 }
   return (
     <>
       <View style={[styles.wrapper, isMine ? styles.wrapperRight : styles.wrapperLeft]}>
+        <View>
+        <TouchableOpacity activeOpacity={1} onPress={handleTap}>
         <View style={[styles.bubble, isMine ? styles.bubbleSent : styles.bubbleReceived]}>
 
           {/* Image attachment */}
@@ -94,6 +115,17 @@ export default function MessageBubble({ message, isMine, partnerLastReadAt = 0 }
             </Text>
             {isMine && <ReadTick isRead={isRead} />}
           </View>
+        </View>
+        </TouchableOpacity>
+
+        {/* Heart reaction badge */}
+        {likedBy.length > 0 && (
+          <View style={[styles.reactionBadge, isMine ? styles.reactionBadgeRight : styles.reactionBadgeLeft]}>
+            <Text style={styles.reactionText}>
+              {iLiked ? '❤️' : '🤍'}{likedBy.length > 1 ? ` ${likedBy.length}` : ''}
+            </Text>
+          </View>
+        )}
         </View>
       </View>
 
@@ -193,4 +225,19 @@ const styles = StyleSheet.create({
   time: { fontSize: 11 },
   timeSent: { color: 'rgba(255,255,255,0.75)' },
   timeReceived: { color: Colors.textSecondary },
+  reactionBadge: {
+    position: 'absolute',
+    bottom: -10,
+    backgroundColor: Colors.background,
+    borderRadius: 10,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  reactionBadgeRight: { right: 6 },
+  reactionBadgeLeft: { left: 6 },
+  reactionText: { fontSize: 12 },
 });

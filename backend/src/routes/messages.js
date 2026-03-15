@@ -1,6 +1,6 @@
 const express = require('express');
 const { authMiddleware } = require('../middleware/auth');
-const { getChatMessages, saveMessage } = require('../services/chatService');
+const { getChatMessages, saveMessage, toggleReaction } = require('../services/chatService');
 const { getDb } = require('../config/database');
 const { sendMessagePush } = require('../services/pushService');
 const { userActiveChat } = require('../socket/socketServer');
@@ -70,6 +70,39 @@ router.post('/:chatId/messages', (req, res, next) => {
     }
 
     res.status(201).json(msg);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /chats/:chatId/messages/:msgId/react
+router.post('/:chatId/messages/:msgId/react', (req, res, next) => {
+  try {
+    const { chatId, msgId } = req.params;
+    const db = getDb();
+
+    const member = db
+      .prepare('SELECT 1 FROM chat_members WHERE chat_id = ? AND user_id = ?')
+      .get([chatId, req.userId]);
+    if (!member) return res.status(403).json({ error: 'Forbidden' });
+
+    const likedBy = toggleReaction(msgId, req.userId);
+
+    const io = req.app.get('io');
+    if (io) {
+      const members = db
+        .prepare('SELECT user_id FROM chat_members WHERE chat_id = ?')
+        .all(chatId);
+      for (const m of members) {
+        io.to(`user:${m.user_id}`).emit('message-reaction', {
+          messageId: msgId,
+          chatId,
+          liked_by: likedBy,
+        });
+      }
+    }
+
+    res.json({ liked_by: likedBy });
   } catch (err) {
     next(err);
   }

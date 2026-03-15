@@ -34,6 +34,7 @@ function decryptMessage(msg) {
     attachment_url: msg.attachment_url || null,
     attachment_type: msg.attachment_type || null,
     attachment_name: msg.attachment_name || null,
+    liked_by: JSON.parse(msg.liked_by || '[]'),
   };
 }
 
@@ -277,6 +278,20 @@ function markChatAsRead(chatId, userId) {
   return now;
 }
 
+function toggleReaction(messageId, userId) {
+  const db = getDb();
+  const msg = db.prepare('SELECT liked_by FROM messages WHERE id = ?').get(messageId);
+  if (!msg) throw Object.assign(new Error('Not found'), { status: 404 });
+
+  const likedBy = JSON.parse(msg.liked_by || '[]');
+  const idx = likedBy.indexOf(userId);
+  if (idx >= 0) likedBy.splice(idx, 1);
+  else likedBy.push(userId);
+
+  db.prepare('UPDATE messages SET liked_by = ? WHERE id = ?').run([JSON.stringify(likedBy), messageId]);
+  return likedBy;
+}
+
 module.exports = {
   getUserChats,
   markChatAsRead,
@@ -288,4 +303,5 @@ module.exports = {
   getUserById,
   updateUser,
   sanitizeUser,
+  toggleReaction,
 };

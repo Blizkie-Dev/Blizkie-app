@@ -13,6 +13,7 @@ export interface Message {
   attachment_url?: string | null;
   attachment_type?: 'image' | 'video' | 'file' | null;
   attachment_name?: string | null;
+  liked_by?: string[];
 }
 
 export interface Chat {
@@ -84,4 +85,12 @@ export async function uploadFile(
 
 export async function markChatAsRead(chatId: string): Promise<void> {
   await client.post(`/chats/${chatId}/read`);
+}
+
+export async function reactToMessage(
+  chatId: string,
+  messageId: string
+): Promise<{ liked_by: string[] }> {
+  const res = await client.post(`/chats/${chatId}/messages/${messageId}/react`);
+  return res.data;
 }

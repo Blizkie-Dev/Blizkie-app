@@ -37,10 +37,22 @@ export function formatLastSeen(timestamp: number): string {
   const diff = Date.now() - timestamp;
   const minutes = Math.floor(diff / 60000);
   if (minutes < 2) return 'Только что';
-  if (minutes < 60) return `${minutes} мин. назад`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} ч. назад`;
-  return 'Давно';
+
+  const date = new Date(timestamp);
+  const now = new Date();
+  const hh = date.getHours().toString().padStart(2, '0');
+  const mm = date.getMinutes().toString().padStart(2, '0');
+  const timeStr = `${hh}:${mm}`;
+
+  if (date.toDateString() === now.toDateString()) return `сегодня в ${timeStr}`;
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) return `вчера в ${timeStr}`;
+
+  const day = date.getDate().toString().padStart(2, '0');
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  return `${day}.${month} в ${timeStr}`;
 }
 
 export function formatChatTime(timestamp: number): string {

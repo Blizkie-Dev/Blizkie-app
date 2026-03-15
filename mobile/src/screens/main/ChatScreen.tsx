@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  AppState,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
@@ -84,12 +85,24 @@ export default function ChatScreen({ navigation, route }: Props) {
   }, [chatName, otherMember]);
 
   // Track this as the active chat (for unread logic + push suppression)
+  // Clear when app is backgrounded so push notifications still arrive
   useEffect(() => {
     setActiveChatId(chat.id);
     setActiveChat(chat.id);
+
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        setActiveChat(chat.id);
+      } else {
+        // backgrounded or inactive — allow push delivery
+        setActiveChat(null);
+      }
+    });
+
     return () => {
       setActiveChatId(null);
       setActiveChat(null);
+      sub.remove();
     };
   }, [chat.id]);
 

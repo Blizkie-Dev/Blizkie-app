@@ -34,6 +34,7 @@ interface ChatsState {
   incrementUnread: (chatId: string) => void;
   setActiveChatId: (chatId: string | null) => void;
   setPartnerReadAt: (chatId: string, readAt: number) => void;
+  clearChats: () => void;
 }
 
 export const useChatsStore = create<ChatsState>((set) => ({
@@ -75,6 +76,7 @@ export const useChatsStore = create<ChatsState>((set) => ({
         c.id === chatId ? { ...c, partner_last_read_at: readAt } : c
       ),
     })),
+  clearChats: () => set({ chats: [], activeChatId: null }),
 }));
 
 // ─── Online Users Slice ────────────────────────────────────────────────────
@@ -83,6 +85,7 @@ interface OnlineState {
   onlineUserIds: Set<string>;
   setUserOnline: (userId: string) => void;
   setUserOffline: (userId: string) => void;
+  clearOnline: () => void;
   isOnline: (userId: string) => boolean;
 }
 
@@ -100,6 +103,7 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
       next.delete(userId);
       return { onlineUserIds: next };
     }),
+  clearOnline: () => set({ onlineUserIds: new Set() }),
   isOnline: (userId) => get().onlineUserIds.has(userId),
 }));
 
@@ -111,6 +115,7 @@ interface MessagesState {
   addMessage: (chatId: string, message: Message) => void;
   prependMessages: (chatId: string, messages: Message[]) => void;
   updateMessageReaction: (chatId: string, messageId: string, liked_by: string[]) => void;
+  clearMessages: () => void;
 }
 
 export const useMessagesStore = create<MessagesState>((set) => ({
@@ -152,4 +157,5 @@ export const useMessagesStore = create<MessagesState>((set) => ({
         },
       };
     }),
+  clearMessages: () => set({ messagesByChatId: {} }),
 }));

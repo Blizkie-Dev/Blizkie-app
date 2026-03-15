@@ -21,13 +21,11 @@ export default function PhoneEmailScreen({ navigation }: Props) {
   const [target, setTarget] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const isEmail = target.includes('@');
-  const isPhone = target.startsWith('+') && target.length >= 7;
-  const isValid = isEmail || isPhone;
+  const isValid = target.includes('@') && target.includes('.');
 
   async function handleSend() {
     if (!isValid) {
-      Alert.alert('Ошибка', 'Введите корректный номер телефона (+79001234567) или email');
+      Alert.alert('Ошибка', 'Введите корректный email');
       return;
     }
     setLoading(true);
@@ -53,7 +51,7 @@ export default function PhoneEmailScreen({ navigation }: Props) {
         <View style={styles.header}>
           <Text style={styles.logo}>Blizkie</Text>
           <Text style={styles.subtitle}>
-            Введите номер телефона или email для входа
+            Введите email для входа
           </Text>
         </View>
 
@@ -62,7 +60,7 @@ export default function PhoneEmailScreen({ navigation }: Props) {
             style={styles.input}
             value={target}
             onChangeText={setTarget}
-            placeholder="Телефон (+79001234567) или Email"
+            placeholder="Email"
             placeholderTextColor={Colors.textLight}
             keyboardType="email-address"
             autoCapitalize="none"
@@ -72,11 +70,7 @@ export default function PhoneEmailScreen({ navigation }: Props) {
           />
 
           <Text style={styles.hint}>
-            {isEmail
-              ? '✉️ Код придёт на почту'
-              : isPhone
-              ? '📱 Код придёт по SMS'
-              : 'Начните с + для телефона или введите email'}
+            {isValid ? '✉️ Код придёт на почту' : 'Введите email для входа'}
           </Text>
 
           <TouchableOpacity

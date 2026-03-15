@@ -15,7 +15,7 @@ export default function ChatListItem({ chat, currentUserId, onPress }: ChatListI
   const otherMember = chat.members.find((m) => m.id !== currentUserId);
   const name = otherMember?.display_name || otherMember?.username || 'Пользователь';
   const lastMsg = chat.last_message;
-  const lastText = lastMsg?.text ||
+  const lastText = lastMsg?.text?.trim() ||
     (lastMsg?.attachment_type === 'image' ? '📷 Фото' :
      lastMsg?.attachment_type === 'video' ? '🎥 Видео' :
      lastMsg?.attachment_type === 'file'  ? '📎 Файл' :

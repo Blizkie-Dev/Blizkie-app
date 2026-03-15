@@ -20,7 +20,7 @@ function decryptMessage(msg) {
       ciphertext: msg.ciphertext,
       iv: msg.iv,
       authTag: msg.auth_tag,
-    });
+    }).trim();
   } catch {
     text = '[encrypted]';
   }

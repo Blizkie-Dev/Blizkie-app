@@ -14,7 +14,12 @@ interface ChatListItemProps {
 export default function ChatListItem({ chat, currentUserId, onPress }: ChatListItemProps) {
   const otherMember = chat.members.find((m) => m.id !== currentUserId);
   const name = otherMember?.display_name || otherMember?.username || 'Пользователь';
-  const lastText = chat.last_message?.text || 'Нет сообщений';
+  const lastMsg = chat.last_message;
+  const lastText = lastMsg?.text ||
+    (lastMsg?.attachment_type === 'image' ? '📷 Фото' :
+     lastMsg?.attachment_type === 'video' ? '🎥 Видео' :
+     lastMsg?.attachment_type === 'file'  ? '📎 Файл' :
+     lastMsg ? '' : 'Нет сообщений');
   const lastTime = chat.last_message ? formatChatTime(chat.last_message.created_at) : '';
   const isLastMine = chat.last_message?.sender_id === currentUserId;
   const unread = chat.unread_count || 0;

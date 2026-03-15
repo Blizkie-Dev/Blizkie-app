@@ -23,7 +23,7 @@ export default function AuthNavigator() {
       />
       <Stack.Screen
         name="VerifyCode"
-        component={VerifyCodeScreen}
+        component={VerifyCodeScreen as any}
         options={{ title: 'Подтверждение' }}
       />
     </Stack.Navigator>

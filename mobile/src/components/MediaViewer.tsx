@@ -25,7 +25,7 @@ interface MediaViewerProps {
 
 function VideoPlayer({ uri }: { uri: string }) {
   const player = useVideoPlayer(uri, (p) => { p.play(); });
-  return <VideoView player={player} style={styles.media} contentFit="contain" allowsFullscreen />;
+  return <VideoView player={player} style={styles.media} contentFit="contain" />;
 }
 
 export default function MediaViewer({ visible, uri, type, onClose }: MediaViewerProps) {

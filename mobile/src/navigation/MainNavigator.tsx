@@ -31,7 +31,7 @@ function ChatsStackNavigator() {
       />
       <ChatsStack.Screen
         name="Chat"
-        component={ChatScreen}
+        component={ChatScreen as any}
         options={{ title: '' }}
       />
       <ChatsStack.Screen

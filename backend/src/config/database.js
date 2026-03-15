@@ -2,12 +2,12 @@ const { Database } = require('node-sqlite3-wasm');
 const path = require('path');
 const fs = require('fs');
 
-const DATA_DIR = path.join(__dirname, '../../data');
+// In production (Railway) set DB_PATH env var to the volume mount path, e.g. /data/blizkie.db
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, '../../data', 'blizkie.db');
+const DATA_DIR = path.dirname(DB_PATH);
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
-
-const DB_PATH = path.join(DATA_DIR, 'blizkie.db');
 const LOCK_PATH = DB_PATH + '.lock';
 
 // node-sqlite3-wasm uses a .lock directory — clean up stale lock from a previous crash

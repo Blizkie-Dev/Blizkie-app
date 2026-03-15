@@ -57,8 +57,9 @@ export default function MessageBubble({
   const hasImage = message.attachment_type === 'image' && message.attachment_url;
   const hasVideo = message.attachment_type === 'video' && message.attachment_url;
   const hasFile = message.attachment_type === 'file' && message.attachment_url;
-  const mediaUri = (hasImage || hasVideo) && message.attachment_url
-    ? `${API_BASE_URL}${message.attachment_url}`
+  const rawUrl = message.attachment_url || '';
+  const mediaUri = (hasImage || hasVideo) && rawUrl
+    ? (rawUrl.startsWith('http') ? rawUrl : `${API_BASE_URL}${rawUrl}`)
     : null;
 
   return (

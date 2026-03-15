@@ -1,0 +1,72 @@
+const express = require('express');
+const { authMiddleware } = require('../middleware/auth');
+const { getChatMessages, saveMessage } = require('../services/chatService');
+const { getDb } = require('../config/database');
+const { sendMessagePush } = require('../services/pushService');
+const { onlineUsers } = require('../socket/socketServer');
+
+const router = express.Router();
+router.use(authMiddleware);
+
+// GET /chats/:chatId/messages?before=<timestamp>&limit=50
+router.get('/:chatId/messages', (req, res, next) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+    const before = req.query.before ? parseInt(req.query.before) : null;
+    const messages = getChatMessages(req.params.chatId, req.userId, {
+      limit,
+      before,
+    });
+    res.json(messages);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /chats/:chatId/messages
+router.post('/:chatId/messages', (req, res, next) => {
+  try {
+    const { text, attachment_url, attachment_type, attachment_name } = req.body;
+    const hasText = text && typeof text === 'string' && text.trim();
+    const hasAttachment = attachment_url && attachment_type;
+    if (!hasText && !hasAttachment) {
+      return res.status(400).json({ error: 'text or attachment is required' });
+    }
+    const attachment = hasAttachment ? { attachment_url, attachment_type, attachment_name } : {};
+    const msg = saveMessage(req.params.chatId, req.userId, hasText ? text.trim() : '', attachment);
+
+    // Broadcast via socket
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`chat:${req.params.chatId}`).emit('new-message', msg);
+    }
+
+    // Push notifications to offline members
+    const db = getDb();
+    const members = db
+      .prepare(
+        `SELECT u.id, u.push_token, u.display_name
+         FROM chat_members cm JOIN users u ON u.id = cm.user_id
+         WHERE cm.chat_id = ?`
+      )
+      .all(req.params.chatId);
+
+    const sender = members.find((m) => m.id === req.userId);
+    const senderName = sender?.display_name || 'Новое сообщение';
+
+    for (const member of members) {
+      if (member.id === req.userId) continue;
+      if (onlineUsers.has(member.id)) continue;
+      if (member.push_token) {
+        const pushText = msg.text || (msg.attachment_type === 'image' ? '📷 Фото' : '📎 Файл');
+        sendMessagePush(member.push_token, senderName, pushText).catch(() => {});
+      }
+    }
+
+    res.status(201).json(msg);
+  } catch (err) {
+    next(err);
+  }
+});
+
+module.exports = router;

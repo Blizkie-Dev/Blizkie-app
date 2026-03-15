@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "Blizkie",
+    "slug": "blizkie",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "sdkVersion": "54.0.0",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#2AABEE"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.blizkie.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#2AABEE"
+      },
+      "package": "com.blizkie.app"
+    },
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Blizkie to access your photos and videos.",
+          "cameraPermission": "Allow Blizkie to access your camera."
+        }
+      ],
+      "expo-video",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#2AABEE",
+          "defaultChannel": "messages"
+        }
+      ]
+    ]
+  }
+}

@@ -44,6 +44,17 @@ router.patch('/me', (req, res, next) => {
   }
 });
 
+// GET /users/check-username?username=xxx  (auth required so bots can't enumerate)
+router.get('/check-username', (req, res) => {
+  const username = (req.query.username || '').toLowerCase().trim();
+  if (!username || !/^[a-z0-9_]{3,32}$/.test(username)) {
+    return res.status(400).json({ error: 'Username must be 3–32 characters: letters, digits, _' });
+  }
+  const { getDb } = require('../config/database');
+  const existing = getDb().prepare('SELECT id FROM users WHERE username = ?').get(username);
+  res.json({ available: !existing });
+});
+
 // GET /users/search?q=...
 router.get('/search', (req, res) => {
   const q = (req.query.q || '').trim();

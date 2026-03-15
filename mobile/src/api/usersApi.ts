@@ -20,3 +20,8 @@ export async function getUserById(id: string): Promise<User> {
   const res = await client.get(`/users/${id}`);
   return res.data;
 }
+
+export async function checkUsername(username: string): Promise<{ available: boolean }> {
+  const res = await client.get('/users/check-username', { params: { username } });
+  return res.data;
+}

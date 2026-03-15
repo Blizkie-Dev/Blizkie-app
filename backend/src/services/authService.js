@@ -105,7 +105,9 @@ async function verifyCode(target, code) {
     ? db.prepare('SELECT * FROM users WHERE email = ?').get(normalTarget)
     : db.prepare('SELECT * FROM users WHERE phone = ?').get(normalTarget);
 
+  let isNew = false;
   if (!user) {
+    isNew = true;
     const userId = uuidv4();
     const ts = Date.now();
     db.prepare(
@@ -116,9 +118,7 @@ async function verifyCode(target, code) {
       isEmail(normalTarget) ? null : normalTarget,
       isEmail(normalTarget) ? normalTarget : null,
       null,
-      isEmail(normalTarget)
-        ? normalTarget.split('@')[0]
-        : normalTarget.replace('+', ''),
+      '',
       ts,
       ts,
     ]);
@@ -134,7 +134,7 @@ async function verifyCode(target, code) {
   ).run([sessionId, user.id, Date.now()]);
 
   const token = sign({ sub: user.id, jti: sessionId });
-  return { token, user: sanitizeUser(user) };
+  return { token, user: sanitizeUser(user), isNew };
 }
 
 function sanitizeUser(u) {

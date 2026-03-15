@@ -47,11 +47,15 @@ export default function VerifyCodeScreen({ navigation, route }: Props) {
 
     setLoading(true);
     try {
-      const { token, user } = await verifyCode(target, finalCode);
+      const { token, user, isNew } = await verifyCode(target, finalCode);
       await saveToken(token);
       await saveUser(user);
-      setAuth(user, token);
-      // Navigation is handled by RootNavigator watching isAuthenticated
+      if (isNew) {
+        // New user — go to profile setup before entering the app
+        navigation.navigate('SetupProfile', { token, user });
+      } else {
+        setAuth(user, token);
+      }
     } catch (err: any) {
       setCode('');
       Alert.alert(

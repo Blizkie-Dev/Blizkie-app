@@ -3,6 +3,7 @@ import client from './client';
 export interface AuthResponse {
   token: string;
   user: User;
+  isNew: boolean;
 }
 
 export interface User {

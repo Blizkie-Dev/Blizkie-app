@@ -21,7 +21,10 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#2AABEE"
       },
-      "package": "com.blizkie.app"
+      "package": "com.blizkie.app",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "plugins": [
       "expo-secure-store",
@@ -41,6 +44,12 @@
           "defaultChannel": "messages"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "0f12709c-a55a-4480-ae9f-91370a70e507"
+      }
+    },
+    "owner": "psshamshin"
   }
 }

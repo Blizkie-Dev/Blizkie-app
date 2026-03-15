@@ -1,5 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import client from '../api/client';
 
 // Show alert + sound when app is in foreground
@@ -37,12 +38,20 @@ export async function setupNotifications(): Promise<void> {
     });
   }
 
+  const projectId =
+    Constants.expoConfig?.extra?.eas?.projectId ??
+    Constants.easConfig?.projectId;
+
+  if (!projectId) {
+    console.log('[Notifications] Push token skipped: run "npx eas init" to configure projectId');
+    return;
+  }
+
   try {
-    const { data: pushToken } = await Notifications.getExpoPushTokenAsync();
+    const { data: pushToken } = await Notifications.getExpoPushTokenAsync({ projectId });
     await client.put('/users/push-token', { push_token: pushToken });
     console.log('[Notifications] Push token registered:', pushToken);
   } catch (err: any) {
-    // projectId not configured yet (requires EAS project) — non-fatal
-    console.log('[Notifications] Push token skipped:', err?.message ?? err);
+    console.log('[Notifications] Push token error:', err?.message ?? err);
   }
 }

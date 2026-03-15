@@ -26,6 +26,7 @@ import { compressImage } from '../../utils/imageUtils';
 import {
   getSocket,
   joinChat,
+  setActiveChat,
   emitTypingStart,
   emitTypingStop,
 } from '../../socket/socketClient';
@@ -82,10 +83,14 @@ export default function ChatScreen({ navigation, route }: Props) {
     });
   }, [chatName, otherMember]);
 
-  // Track this as the active chat (for unread logic in list)
+  // Track this as the active chat (for unread logic + push suppression)
   useEffect(() => {
     setActiveChatId(chat.id);
-    return () => setActiveChatId(null);
+    setActiveChat(chat.id);
+    return () => {
+      setActiveChatId(null);
+      setActiveChat(null);
+    };
   }, [chat.id]);
 
   // Load initial messages and mark as read

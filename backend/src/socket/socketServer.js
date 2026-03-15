@@ -6,6 +6,9 @@ const { saveMessage, getUserChats } = require('../services/chatService');
 // Track which userIds are currently connected
 const onlineUsers = new Set();
 
+// Track which chat each user currently has open (userId → chatId | null)
+const userActiveChat = new Map();
+
 function initSocket(httpServer) {
   const io = new Server(httpServer, {
     cors: {
@@ -63,6 +66,11 @@ function initSocket(httpServer) {
       socket.join(`chat:${chatId}`);
     });
 
+    // Track which chat the user currently has open (for push suppression)
+    socket.on('set-active-chat', (chatId) => {
+      userActiveChat.set(userId, chatId || null);
+    });
+
     // Typing indicators
     socket.on('typing-start', ({ chatId }) => {
       socket.to(`chat:${chatId}`).emit('user-typing', { userId, chatId });
@@ -77,6 +85,7 @@ function initSocket(httpServer) {
 
     socket.on('disconnect', () => {
       onlineUsers.delete(userId);
+      userActiveChat.delete(userId);
       getDb()
         .prepare('UPDATE users SET last_seen_at = ? WHERE id = ?')
         .run([Date.now(), userId]);
@@ -87,4 +96,4 @@ function initSocket(httpServer) {
   return io;
 }
 
-module.exports = { initSocket, onlineUsers };
+module.exports = { initSocket, onlineUsers, userActiveChat };

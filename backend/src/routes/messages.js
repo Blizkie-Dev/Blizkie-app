@@ -3,7 +3,7 @@ const { authMiddleware } = require('../middleware/auth');
 const { getChatMessages, saveMessage } = require('../services/chatService');
 const { getDb } = require('../config/database');
 const { sendMessagePush } = require('../services/pushService');
-const { onlineUsers } = require('../socket/socketServer');
+const { userActiveChat } = require('../socket/socketServer');
 
 const router = express.Router();
 router.use(authMiddleware);
@@ -56,10 +56,10 @@ router.post('/:chatId/messages', (req, res, next) => {
       }
     }
 
-    // Push notifications to offline members only
+    // Push to everyone except sender and users who have this exact chat open
     for (const member of members) {
       if (member.id === req.userId) continue;
-      if (onlineUsers.has(member.id)) continue;
+      if (userActiveChat.get(member.id) === req.params.chatId) continue;
       if (member.push_token) {
         const pushText = msg.text || (msg.attachment_type === 'image' ? '📷 Фото' : '📎 Файл');
         sendMessagePush(member.push_token, senderName, pushText, {

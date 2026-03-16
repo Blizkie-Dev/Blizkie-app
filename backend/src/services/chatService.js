@@ -88,19 +88,50 @@ function getUserChats(userId) {
       )
       .get([chat.id, userId, myLastReadAt]);
 
-    // Partner's last_read_at (for read receipts — when did they read our messages)
-    const partnerMember = db
-      .prepare('SELECT last_read_at FROM chat_members WHERE chat_id = ? AND user_id != ?')
-      .get([chat.id, userId]);
+    // Partner's last_read_at — only meaningful for direct chats
+    let partner_last_read_at = 0;
+    if (chat.type === 'direct') {
+      const partnerMember = db
+        .prepare('SELECT last_read_at FROM chat_members WHERE chat_id = ? AND user_id != ?')
+        .get([chat.id, userId]);
+      partner_last_read_at = partnerMember?.last_read_at || 0;
+    }
 
     return {
       ...chat,
       members,
       last_message: lastMsg ? decryptMessage(lastMsg) : null,
       unread_count: unread_count || 0,
-      partner_last_read_at: partnerMember?.last_read_at || 0,
+      partner_last_read_at,
     };
   });
+}
+
+/**
+ * Creates a group chat with a name and at least 3 members (creator + 2+).
+ */
+function createGroupChat(name, creatorId, memberIds) {
+  const db = getDb();
+  const allMembers = [...new Set([creatorId, ...memberIds])];
+  if (allMembers.length < 3) {
+    throw Object.assign(new Error('Group chat requires at least 3 members'), { status: 400 });
+  }
+
+  const chatId = uuidv4();
+  const now = Date.now();
+
+  db.exec('BEGIN');
+  try {
+    db.prepare('INSERT INTO chats (id, type, name, created_at) VALUES (?, ?, ?, ?)').run([chatId, 'group', name.trim(), now]);
+    for (const memberId of allMembers) {
+      db.prepare('INSERT INTO chat_members (chat_id, user_id, joined_at) VALUES (?, ?, ?)').run([chatId, memberId, now]);
+    }
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+  return getChatById(chatId, creatorId);
 }
 
 /**
@@ -296,6 +327,7 @@ module.exports = {
   getUserChats,
   markChatAsRead,
   getOrCreateDirectChat,
+  createGroupChat,
   getChatById,
   getChatMessages,
   saveMessage,

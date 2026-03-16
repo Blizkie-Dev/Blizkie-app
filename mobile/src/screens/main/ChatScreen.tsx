@@ -66,6 +66,9 @@ export default function ChatScreen({ navigation, route }: Props) {
   const flatListRef = useRef<FlatList>(null);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTyping = useRef(false);
+  const isAtBottom = useRef(true);
+  const isInitialLoad = useRef(true);
+  const lastMessageIdRef = useRef<string | null>(null);
 
   const isGroup = chat.type === 'group';
   const otherMember = isGroup ? null : chat.members.find((m) => m.id !== user.id);
@@ -219,8 +222,24 @@ export default function ChatScreen({ navigation, route }: Props) {
   }
 
   useEffect(() => {
-    if (messages.length > 0) scrollToEnd();
-  }, [messages.length]);
+    if (messages.length === 0) return;
+
+    const lastMessageId = messages[messages.length - 1]?.id;
+    const prevLast = lastMessageIdRef.current;
+    lastMessageIdRef.current = lastMessageId || null;
+
+    // Initial load: always scroll to bottom
+    if (isInitialLoad.current) {
+      scrollToEnd();
+      isInitialLoad.current = false;
+      return;
+    }
+
+    // New message appended: scroll only if we were already at bottom
+    if (lastMessageId && lastMessageId !== prevLast && isAtBottom.current) {
+      scrollToEnd();
+    }
+  }, [messages]);
 
   function handleTextChange(text: string) {
     setInputText(text);
@@ -359,9 +378,13 @@ export default function ChatScreen({ navigation, route }: Props) {
           typingUsers.length > 0 ? <TypingIndicator /> : null
         }
         contentContainerStyle={styles.messagesList}
-        onLayout={scrollToEnd}
         onScroll={({ nativeEvent }) => {
-          if (nativeEvent.contentOffset.y < 80) {
+          const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+          const distanceFromBottom =
+            contentSize.height - (contentOffset.y + layoutMeasurement.height);
+          isAtBottom.current = distanceFromBottom < 120;
+
+          if (contentOffset.y < 80) {
             loadMoreMessages();
           }
         }}

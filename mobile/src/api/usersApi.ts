@@ -25,7 +25,3 @@ export async function checkUsername(username: string): Promise<{ available: bool
   const res = await client.get('/users/check-username', { params: { username } });
   return res.data;
 }
-
-export async function clearPushToken(): Promise<void> {
-  await client.delete('/users/push-token');
-}

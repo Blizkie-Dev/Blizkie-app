@@ -12,7 +12,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/colors';
-import { updateMe, clearPushToken } from '../../api/usersApi';
+import { updateMe } from '../../api/usersApi';
 import { uploadFile } from '../../api/chatsApi';
 import { useAuthStore } from '../../store';
 import { clearStorage } from '../../utils/storage';
@@ -88,7 +88,6 @@ export default function ProfileScreen() {
           text: 'Выйти',
           style: 'destructive',
           onPress: async () => {
-            try { await clearPushToken(); } catch {}
             disconnectSocket();
             await clearStorage();
             clearAuth();

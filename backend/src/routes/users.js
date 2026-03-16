@@ -23,15 +23,6 @@ router.put('/push-token', (req, res) => {
   res.json({ ok: true });
 });
 
-// DELETE /users/push-token
-router.delete('/push-token', (req, res) => {
-  const { getDb } = require('../config/database');
-  getDb()
-    .prepare('UPDATE users SET push_token = NULL WHERE id = ?')
-    .run([req.userId]);
-  res.json({ ok: true });
-});
-
 // GET /users/me
 router.get('/me', (req, res) => {
   const user = getUserById(req.userId);

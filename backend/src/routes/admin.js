@@ -1,8 +1,32 @@
 const express = require('express');
 const { authMiddleware } = require('../middleware/auth');
 const { getDb } = require('../config/database');
+const { sign } = require('../utils/jwt');
 
 const router = express.Router();
+
+// POST /admin/api/login
+router.post('/login', (req, res, next) => {
+  try {
+    const { username, password } = req.body;
+    if (username.toLowerCase() !== 'pashaaa' || password !== '1234admin') {
+      return res.status(401).json({ error: 'Неверный логин или пароль' });
+    }
+    const db = getDb();
+    const user = db.prepare('SELECT id FROM users WHERE LOWER(username) = ?').get('pashaaa');
+    
+    if (!user) {
+      return res.status(404).json({ error: 'Пользователь pashaaa не найден в БД' });
+    }
+    
+    // Create an admin token
+    const token = sign({ sub: user.id, jti: 'admin-session' });
+    res.json({ token });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.use(authMiddleware);
 
 // Middleware to ensure the user is 'pashaaa'

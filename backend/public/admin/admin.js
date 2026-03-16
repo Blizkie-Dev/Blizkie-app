@@ -1,5 +1,5 @@
 const API_BASE = '/admin/api';
-const AUTH_API = '/auth/login';
+const AUTH_API = '/admin/api/login';
 
 let token = localStorage.getItem('admin_token');
 

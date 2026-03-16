@@ -37,6 +37,7 @@ function runMigrations() {
       id         TEXT PRIMARY KEY,
       type       TEXT NOT NULL DEFAULT 'direct',
       name       TEXT,
+      avatar_url TEXT,
       created_at INTEGER NOT NULL
     );
 
@@ -94,6 +95,11 @@ function runMigrations() {
   // Add creator_id to group chats for member management
   try {
     db.exec('ALTER TABLE chats ADD COLUMN creator_id TEXT');
+  } catch { /* already exists */ }
+
+  // Add avatar_url to chats if it doesn't exist (for existing tables)
+  try {
+    db.exec('ALTER TABLE chats ADD COLUMN avatar_url TEXT');
   } catch { /* already exists */ }
 
   // Assign user 'pasha' as the creator for all legacy groups

@@ -10,8 +10,10 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { User } from '../../api/authApi';
-import { Chat, addChatMember, removeChatMember } from '../../api/chatsApi';
+import { Chat, addChatMember, removeChatMember, updateGroup, uploadFile } from '../../api/chatsApi';
+import { compressImage } from '../../utils/imageUtils';
 import { searchUsers } from '../../api/usersApi';
 import { useAuthStore, useChatsStore } from '../../store';
 import Avatar from '../../components/Avatar';
@@ -43,6 +45,7 @@ export default function GroupInfoScreen({ navigation, route }: Props) {
   const [searching, setSearching] = useState(false);
   const [adding, setAdding] = useState<string | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const searchTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -103,32 +106,66 @@ export default function GroupInfoScreen({ navigation, route }: Props) {
     }
   }
 
+  async function handleChangeAvatar() {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Нет доступа', 'Разрешите доступ к галерее');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 1,
+      });
+      if (result.canceled || !result.assets[0]) return;
+      const asset = result.assets[0];
+      
+      setUploadingAvatar(true);
+      const compressedUri = await compressImage(asset.uri);
+      const uploaded = await uploadFile(compressedUri, 'group_avatar.jpg', 'image/jpeg');
+      const updated = await updateGroup(liveChat.id, { avatar_url: uploaded.url });
+      upsertChat(updated);
+    } catch (err: any) {
+      Alert.alert('Ошибка', err?.message || String(err));
+    } finally {
+      setUploadingAvatar(false);
+    }
+  }
+
   const memberName = (u: User) => u.display_name || u.username || 'Пользователь';
 
   return (
     <View style={styles.container}>
       {/* Group header */}
       <View style={styles.header}>
-        <View style={styles.groupAvatar}>
-          <Text style={styles.groupAvatarEmoji}>👥</Text>
-        </View>
+        <TouchableOpacity onPress={handleChangeAvatar} disabled={uploadingAvatar} activeOpacity={0.8}>
+          <View style={styles.groupAvatarContainer}>
+            <Avatar uri={liveChat.avatar_url} name={liveChat.name || 'G'} size={80} />
+            <View style={styles.avatarEditBadge}>
+              {uploadingAvatar 
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Ionicons name="camera" size={16} color="#fff" />
+              }
+            </View>
+          </View>
+        </TouchableOpacity>
         <Text style={styles.groupName}>{liveChat.name || 'Группа'}</Text>
         <Text style={styles.memberCount}>{members.length} участников</Text>
       </View>
 
-      {/* Add member button (creator only) */}
-      {isCreator && (
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => setShowSearch((v) => !v)}
-          activeOpacity={0.8}
-        >
-          <Ionicons name={showSearch ? 'close' : 'person-add'} size={18} color={C.primary} />
-          <Text style={styles.addButtonText}>
-            {showSearch ? 'Закрыть' : 'Добавить участника'}
-          </Text>
-        </TouchableOpacity>
-      )}
+      {/* Add member button (Now for everyone) */}
+      <TouchableOpacity
+        style={styles.addButton}
+        onPress={() => setShowSearch((v) => !v)}
+        activeOpacity={0.8}
+      >
+        <Ionicons name={showSearch ? 'close' : 'person-add'} size={18} color={C.primary} />
+        <Text style={styles.addButtonText}>
+          {showSearch ? 'Закрыть' : 'Добавить участника'}
+        </Text>
+      </TouchableOpacity>
 
       {/* Search panel */}
       {showSearch && (
@@ -226,17 +263,22 @@ const createStyles = (C: ReturnType<typeof import('../../hooks/useColors').useCo
       paddingVertical: 24,
       backgroundColor: C.background,
     },
-    groupAvatar: {
-      width: 80,
-      height: 80,
-      borderRadius: 40,
-      backgroundColor: C.primary + '20',
-      alignItems: 'center',
-      justifyContent: 'center',
+    groupAvatarContainer: {
+      position: 'relative',
       marginBottom: 12,
     },
-    groupAvatarEmoji: {
-      fontSize: 36,
+    avatarEditBadge: {
+      position: 'absolute',
+      right: -2,
+      bottom: -2,
+      backgroundColor: C.primary,
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 2,
+      borderColor: C.background,
     },
     groupName: {
       fontSize: 20,

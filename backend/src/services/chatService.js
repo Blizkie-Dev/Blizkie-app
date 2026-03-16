@@ -48,7 +48,7 @@ function getUserChats(userId) {
 
   const chats = db
     .prepare(
-      `SELECT c.id, c.type, c.name, c.created_at
+      `SELECT c.id, c.type, c.name, c.avatar_url, c.created_at, c.creator_id
        FROM chats c
        JOIN chat_members cm ON cm.chat_id = c.id
        WHERE cm.user_id = ?
@@ -204,7 +204,10 @@ function addChatMember(chatId, requesterId, newUserId) {
   const db = getDb();
   const chat = db.prepare('SELECT * FROM chats WHERE id = ? AND type = ?').get([chatId, 'group']);
   if (!chat) throw Object.assign(new Error('Group chat not found'), { status: 404 });
-  if (chat.creator_id !== requesterId) throw Object.assign(new Error('Only the creator can add members'), { status: 403 });
+
+  // Relaxed requirement: any member can add others
+  const requesterMember = db.prepare('SELECT 1 FROM chat_members WHERE chat_id = ? AND user_id = ?').get([chatId, requesterId]);
+  if (!requesterMember) throw Object.assign(new Error('Only group members can add others'), { status: 403 });
 
   const alreadyMember = db.prepare('SELECT 1 FROM chat_members WHERE chat_id = ? AND user_id = ?').get([chatId, newUserId]);
   if (alreadyMember) throw Object.assign(new Error('User is already a member'), { status: 409 });
@@ -356,6 +359,29 @@ function toggleReaction(messageId, userId) {
   return likedBy;
 }
 
+/**
+ * Updates group chat metadata (name, avatar). Any member can do this.
+ */
+function updateChatMetadata(chatId, requesterId, fields) {
+  const db = getDb();
+  const chat = db.prepare('SELECT * FROM chats WHERE id = ? AND type = ?').get([chatId, 'group']);
+  if (!chat) throw Object.assign(new Error('Group chat not found'), { status: 404 });
+
+  // Membership check
+  const member = db.prepare('SELECT 1 FROM chat_members WHERE chat_id = ? AND user_id = ?').get([chatId, requesterId]);
+  if (!member) throw Object.assign(new Error('Forbidden'), { status: 403 });
+
+  const allowed = ['name', 'avatar_url'];
+  const data = Object.entries(fields).filter(([k, v]) => allowed.includes(k) && v !== undefined);
+  if (!data.length) return getChatById(chatId, requesterId);
+
+  const setClause = data.map(([k]) => `${k} = ?`).join(', ');
+  const values = data.map(([, v]) => v);
+
+  db.prepare(`UPDATE chats SET ${setClause} WHERE id = ?`).run([...values, chatId]);
+  return getChatById(chatId, requesterId);
+}
+
 module.exports = {
   getUserChats,
   markChatAsRead,
@@ -371,4 +397,5 @@ module.exports = {
   toggleReaction,
   addChatMember,
   removeChatMember,
+  updateChatMetadata,
 };

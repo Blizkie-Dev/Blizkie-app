@@ -20,6 +20,7 @@ export interface Chat {
   id: string;
   type: 'direct' | 'group';
   name: string | null;
+  avatar_url: string | null;
   created_at: number;
   creator_id: string | null;
   members: User[];
@@ -108,5 +109,13 @@ export async function addChatMember(chatId: string, userId: string): Promise<Cha
 
 export async function removeChatMember(chatId: string, userId: string): Promise<Chat> {
   const res = await client.delete(`/chats/${chatId}/members/${userId}`);
+  return res.data;
+}
+
+export async function updateGroup(
+  chatId: string,
+  fields: Partial<{ name: string; avatar_url: string }>
+): Promise<Chat> {
+  const res = await client.patch(`/chats/${chatId}`, fields);
   return res.data;
 }

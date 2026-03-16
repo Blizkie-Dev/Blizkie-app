@@ -8,6 +8,7 @@ const {
   markChatAsRead,
   addChatMember,
   removeChatMember,
+  updateChatMetadata,
 } = require('../services/chatService');
 
 const router = express.Router();
@@ -119,6 +120,26 @@ router.delete('/:id/members/:userId', (req, res, next) => {
       // Notify the removed user so they can remove the chat from their list
       io.to(`user:${req.params.userId}`).emit('chat-removed', { chatId: req.params.id });
     }
+    res.json(updatedChat);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PATCH /chats/:id — update chat metadata (name, avatar)
+router.patch('/:id', (req, res, next) => {
+  try {
+    const { name, avatar_url } = req.body;
+    const updatedChat = updateChatMetadata(req.params.id, req.userId, { name, avatar_url });
+
+    // Notify all members that the chat was updated
+    const io = req.app.get('io');
+    if (io) {
+      for (const member of updatedChat.members) {
+        io.to(`user:${member.id}`).emit('chat-updated', updatedChat);
+      }
+    }
+
     res.json(updatedChat);
   } catch (err) {
     next(err);

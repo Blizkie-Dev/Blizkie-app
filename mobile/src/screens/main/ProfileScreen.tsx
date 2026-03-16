@@ -10,7 +10,6 @@ import {
   ActivityIndicator,
   Switch,
   Animated,
-  Dimensions,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,8 +23,6 @@ import { compressImage } from '../../utils/imageUtils';
 import { disconnectSocket } from '../../socket/socketClient';
 import Avatar from '../../components/Avatar';
 import { useColors } from '../../hooks/useColors';
-
-const SCREEN_W = Dimensions.get('window').width;
 
 export default function ProfileScreen() {
   const { user, updateUser, clearAuth } = useAuthStore();
@@ -47,31 +44,27 @@ export default function ProfileScreen() {
     { useNativeDriver: true }
   );
 
+  // Cap at 50px so the screen never fully leaves — no blank-screen flash
   const clampedX = translateX.interpolate({
-    inputRange: [-SCREEN_W, 0, SCREEN_W],
-    outputRange: [0, 0, SCREEN_W],
+    inputRange: [-SCREEN_W, 0, 50],
+    outputRange: [0, 0, 50],
     extrapolate: 'clamp',
   });
 
   const handleStateChange = ({ nativeEvent }: any) => {
-    if (nativeEvent.state === State.END || nativeEvent.state === State.CANCELLED || nativeEvent.state === State.FAILED) {
-      if (nativeEvent.state === State.END && nativeEvent.translationX > 80) {
-        Animated.timing(translateX, {
-          toValue: SCREEN_W,
-          duration: 220,
-          useNativeDriver: true,
-        }).start(() => {
-          navigation.navigate('Chats');
-          translateX.setValue(0);
-        });
-      } else {
-        Animated.spring(translateX, {
-          toValue: 0,
-          useNativeDriver: true,
-          bounciness: 6,
-          speed: 20,
-        }).start();
+    const { state, translationX } = nativeEvent;
+    if (state === State.END) {
+      if (translationX > 60) {
+        navigation.navigate('Chats');
       }
+      Animated.spring(translateX, {
+        toValue: 0,
+        useNativeDriver: true,
+        bounciness: 8,
+        speed: 18,
+      }).start();
+    } else if (state === State.CANCELLED || state === State.FAILED) {
+      Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
     }
   };
 

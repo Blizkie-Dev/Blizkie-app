@@ -48,7 +48,7 @@ export default function ChatScreen({ navigation, route }: Props) {
   const { chat } = route.params;
   const headerHeight = useHeaderHeight();
   const user = useAuthStore((s) => s.user)!;
-  const { messagesByChatId, setMessages, addMessage, updateMessageReaction } = useMessagesStore();
+  const { messagesByChatId, setMessages, addMessage, prependMessages, updateMessageReaction } = useMessagesStore();
   const { updateLastMessage, markChatRead, setActiveChatId, setPartnerReadAt, chats } = useChatsStore();
   const currentChat = chats.find((c) => c.id === chat.id);
   const partnerLastReadAt = currentChat?.partner_last_read_at || 0;
@@ -58,6 +58,8 @@ export default function ChatScreen({ navigation, route }: Props) {
   const messages = messagesByChatId[chat.id] || [];
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [sending, setSending] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [pendingMedia, setPendingMedia] = useState<PendingMedia | null>(null);
@@ -121,8 +123,10 @@ export default function ChatScreen({ navigation, route }: Props) {
   useEffect(() => {
     (async () => {
       try {
-        const data = await getMessages(chat.id);
+        const limit = 50;
+        const data = await getMessages(chat.id, { limit });
         setMessages(chat.id, data);
+        setHasMore(data.length === limit);
         markChatAsRead(chat.id).catch(() => {});
         markChatRead(chat.id);
       } catch (err) {
@@ -189,6 +193,29 @@ export default function ChatScreen({ navigation, route }: Props) {
 
   function scrollToEnd() {
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+  }
+
+  async function loadMoreMessages() {
+    if (!hasMore || loadingMore || loading) return;
+    const msgs = messages;
+    const oldest = msgs[0];
+    if (!oldest) return;
+
+    setLoadingMore(true);
+    try {
+      const limit = 50;
+      const data = await getMessages(chat.id, { before: oldest.created_at, limit });
+      if (data.length < limit) {
+        setHasMore(false);
+      }
+      if (data.length > 0) {
+        prependMessages(chat.id, data);
+      }
+    } catch (err) {
+      console.warn('Failed to load more messages', err);
+    } finally {
+      setLoadingMore(false);
+    }
   }
 
   useEffect(() => {
@@ -333,6 +360,13 @@ export default function ChatScreen({ navigation, route }: Props) {
         }
         contentContainerStyle={styles.messagesList}
         onLayout={scrollToEnd}
+        onScroll={({ nativeEvent }) => {
+          if (nativeEvent.contentOffset.y < 80) {
+            loadMoreMessages();
+          }
+        }}
+        scrollEventThrottle={100}
+        maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
       />
 
       {pendingMedia && (

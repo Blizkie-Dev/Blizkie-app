@@ -249,6 +249,11 @@ export default function ChatScreen({ navigation, route }: Props) {
     if (lastMessageId && lastMessageId !== prevLast && isAtBottom.current) {
       shouldScrollToEnd.current = true;
     }
+
+    if (shouldScrollToEnd.current) {
+      scrollToEnd();
+      shouldScrollToEnd.current = false;
+    }
   }, [messages]);
 
   function handleTextChange(text: string) {
@@ -400,12 +405,6 @@ export default function ChatScreen({ navigation, route }: Props) {
         }}
         scrollEventThrottle={100}
         maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
-        onContentSizeChange={() => {
-          if (shouldScrollToEnd.current) {
-            scrollToEnd();
-            shouldScrollToEnd.current = false;
-          }
-        }}
       />
 
       {pendingMedia && (

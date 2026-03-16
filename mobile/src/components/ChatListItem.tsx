@@ -13,9 +13,12 @@ interface ChatListItemProps {
 }
 
 export default function ChatListItem({ chat, currentUserId, onPress }: ChatListItemProps) {
-  const otherMember = chat.members.find((m) => m.id !== currentUserId);
+  const isGroup = chat.type === 'group';
+  const otherMember = isGroup ? null : chat.members.find((m) => m.id !== currentUserId);
   const isOnline = useOnlineStore((s) => otherMember ? s.onlineUserIds.has(otherMember.id) : false);
-  const name = otherMember?.display_name || otherMember?.username || 'Пользователь';
+  const name = isGroup
+    ? (chat.name || 'Группа')
+    : (otherMember?.display_name || otherMember?.username || 'Пользователь');
   const lastMsg = chat.last_message;
   const lastText = lastMsg?.text?.trim() ||
     (lastMsg?.attachment_type === 'image' ? '📷 Фото' :
@@ -28,7 +31,7 @@ export default function ChatListItem({ chat, currentUserId, onPress }: ChatListI
 
   return (
     <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.7}>
-      <Avatar uri={otherMember?.avatar_url} name={name} size={52} online={isOnline} />
+      <Avatar uri={isGroup ? null : otherMember?.avatar_url} name={isGroup ? '👥' : name} size={52} online={isGroup ? false : isOnline} />
       <View style={styles.content}>
         <View style={styles.row}>
           <Text style={styles.name} numberOfLines={1}>

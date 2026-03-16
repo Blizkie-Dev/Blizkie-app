@@ -6,6 +6,7 @@ import { Colors } from '../constants/colors';
 import ChatsListScreen from '../screens/main/ChatsListScreen';
 import ChatScreen from '../screens/main/ChatScreen';
 import SearchUsersScreen from '../screens/main/SearchUsersScreen';
+import CreateGroupScreen from '../screens/main/CreateGroupScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 
 const Tab = createBottomTabNavigator();
@@ -38,6 +39,11 @@ function ChatsStackNavigator() {
         name="SearchUsers"
         component={SearchUsersScreen}
         options={{ title: 'Новый чат' }}
+      />
+      <ChatsStack.Screen
+        name="CreateGroup"
+        component={CreateGroupScreen}
+        options={{ title: 'Новая группа' }}
       />
     </ChatsStack.Navigator>
   );

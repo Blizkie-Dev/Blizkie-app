@@ -63,8 +63,11 @@ export default function ChatScreen({ navigation, route }: Props) {
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTyping = useRef(false);
 
-  const otherMember = chat.members.find((m) => m.id !== user.id);
-  const chatName = otherMember?.display_name || otherMember?.username || 'Чат';
+  const isGroup = chat.type === 'group';
+  const otherMember = isGroup ? null : chat.members.find((m) => m.id !== user.id);
+  const chatName = isGroup
+    ? (chat.name || 'Группа')
+    : (otherMember?.display_name || otherMember?.username || 'Чат');
   const onlineUserIds = useOnlineStore((s) => s.onlineUserIds);
   const partnerIsOnline = otherMember ? onlineUserIds.has(otherMember.id) : false;
 
@@ -72,21 +75,27 @@ export default function ChatScreen({ navigation, route }: Props) {
     navigation.setOptions({
       headerTitle: () => (
         <TouchableOpacity style={styles.headerTitle}>
-          <Avatar uri={otherMember?.avatar_url} name={chatName} size={36} />
+          <Avatar uri={isGroup ? null : otherMember?.avatar_url} name={isGroup ? '👥' : chatName} size={36} />
           <View style={styles.headerInfo}>
             <Text style={styles.headerName}>{chatName}</Text>
-            <Text style={[styles.headerStatus, partnerIsOnline && styles.headerStatusOnline]}>
-              {otherMember
-                ? partnerIsOnline
-                  ? 'онлайн'
-                  : formatLastSeen(otherMember.last_seen_at || 0)
-                : ''}
-            </Text>
+            {isGroup ? (
+              <Text style={styles.headerStatus}>
+                {chat.members.length} участника
+              </Text>
+            ) : (
+              <Text style={[styles.headerStatus, partnerIsOnline && styles.headerStatusOnline]}>
+                {otherMember
+                  ? partnerIsOnline
+                    ? 'онлайн'
+                    : formatLastSeen(otherMember.last_seen_at || 0)
+                  : ''}
+              </Text>
+            )}
           </View>
         </TouchableOpacity>
       ),
     });
-  }, [chatName, otherMember, partnerIsOnline]);
+  }, [chatName, otherMember, partnerIsOnline, isGroup]);
 
   // Track this as the active chat (for unread logic + push suppression)
   // Clear when app is backgrounded so push notifications still arrive
@@ -311,7 +320,7 @@ export default function ChatScreen({ navigation, route }: Props) {
           <MessageBubble
             message={item}
             isMine={item.sender_id === user.id}
-            partnerLastReadAt={partnerLastReadAt}
+            partnerLastReadAt={isGroup ? 0 : partnerLastReadAt}
             currentUserId={user.id}
             chatMembers={chat.members}
             onReact={handleReact}

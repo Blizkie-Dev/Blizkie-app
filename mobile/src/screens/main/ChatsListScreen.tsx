@@ -66,8 +66,17 @@ export default function ChatsListScreen({ navigation }: Props) {
       updateLastMessage(message.chat_id, message);
     };
 
+    const onChatCreated = (chat: any) => {
+      upsertChat(chat);
+      joinChat(chat.id);
+    };
+
     socket.on('new-message', handler);
-    return () => { socket.off('new-message', handler); };
+    socket.on('chat-created', onChatCreated);
+    return () => {
+      socket.off('new-message', handler);
+      socket.off('chat-created', onChatCreated);
+    };
   }, []);
 
   if (loading) {
@@ -117,6 +126,14 @@ export default function ChatsListScreen({ navigation }: Props) {
         }
         contentContainerStyle={sortedChats.length === 0 ? styles.emptyList : undefined}
       />
+
+      <TouchableOpacity
+        style={[styles.fab, styles.fabGroup]}
+        onPress={() => navigation.navigate('CreateGroup')}
+        activeOpacity={0.85}
+      >
+        <Text style={styles.fabIcon}>👥</Text>
+      </TouchableOpacity>
 
       <TouchableOpacity
         style={styles.fab}
@@ -180,6 +197,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 8,
+  },
+  fabGroup: {
+    bottom: 92,
   },
   fabIcon: {
     fontSize: 22,

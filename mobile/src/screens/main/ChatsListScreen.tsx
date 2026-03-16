@@ -47,32 +47,28 @@ export default function ChatsListScreen({ navigation }: Props) {
     { useNativeDriver: true }
   );
 
+  // Cap at 50px so the screen never fully leaves — no black-hole flash
   const clampedX = translateX.interpolate({
-    inputRange: [-SCREEN_W, 0, SCREEN_W],
-    outputRange: [-SCREEN_W, 0, 0],
+    inputRange: [-50, 0, SCREEN_W],
+    outputRange: [-50, 0, 0],
     extrapolate: 'clamp',
   });
 
   const handleSwipeStateChange = ({ nativeEvent }: any) => {
-    if (nativeEvent.state === State.END || nativeEvent.state === State.CANCELLED || nativeEvent.state === State.FAILED) {
-      if (nativeEvent.state === State.END && nativeEvent.translationX < -80) {
+    const { state, translationX } = nativeEvent;
+    if (state === State.END) {
+      if (translationX < -60) {
         if (fabOpen) closeFab();
-        Animated.timing(translateX, {
-          toValue: -SCREEN_W,
-          duration: 220,
-          useNativeDriver: true,
-        }).start(() => {
-          navigation.navigate('Profile');
-          translateX.setValue(0);
-        });
-      } else {
-        Animated.spring(translateX, {
-          toValue: 0,
-          useNativeDriver: true,
-          bounciness: 6,
-          speed: 20,
-        }).start();
+        navigation.navigate('Profile');
       }
+      Animated.spring(translateX, {
+        toValue: 0,
+        useNativeDriver: true,
+        bounciness: 8,
+        speed: 18,
+      }).start();
+    } else if (state === State.CANCELLED || state === State.FAILED) {
+      Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
     }
   };
 

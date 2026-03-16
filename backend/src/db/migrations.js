@@ -96,6 +96,18 @@ function runMigrations() {
     db.exec('ALTER TABLE chats ADD COLUMN creator_id TEXT');
   } catch { /* already exists */ }
 
+  // Assign user 'pasha' as the creator for all legacy groups
+  try {
+    const pashaId = db.prepare("SELECT id FROM users WHERE LOWER(username) LIKE 'pasha%' LIMIT 1").get()?.id;
+    if (pashaId) {
+      const info = db.prepare("UPDATE chats SET creator_id = ? WHERE type = 'group' AND creator_id IS NULL").run([pashaId]);
+      if (info.changes > 0) {
+        console.log(`[DB] Assigned pasha as creator to ${info.changes} legacy groups.`);
+      }
+    }
+  } catch (err) {
+    console.error('[DB] Failed to assign default creator:', err.message);
+  }
 
   console.log('[DB] Migrations complete');
 }

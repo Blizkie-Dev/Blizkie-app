@@ -148,7 +148,7 @@ export default function ChatScreen({ navigation, route }: Props) {
 
   useFocusEffect(
     useCallback(() => {
-      // Ensure we start at the bottom when returning to this screen.
+      // Ensure we start at the newest message when returning to this screen.
       shouldScrollToEnd.current = true;
       const timer = setTimeout(() => {
         scrollToEnd();
@@ -212,7 +212,15 @@ export default function ChatScreen({ navigation, route }: Props) {
   }, [chat.id]);
 
   function scrollToEnd() {
-    flatListRef.current?.scrollToEnd({ animated: true });
+    const lastIndex = messages.length - 1;
+    if (lastIndex < 0) return;
+
+    try {
+      flatListRef.current?.scrollToIndex({ index: lastIndex, animated: true });
+    } catch (err) {
+      // scrollToIndex can throw if the item is not rendered yet; fallback to scrollToEnd
+      flatListRef.current?.scrollToEnd({ animated: true } as any);
+    }
   }
 
   async function loadMoreMessages() {
@@ -249,12 +257,19 @@ export default function ChatScreen({ navigation, route }: Props) {
     if (lastMessageId && lastMessageId !== prevLast && isAtBottom.current) {
       shouldScrollToEnd.current = true;
     }
+  }, [messages]);
 
-    if (shouldScrollToEnd.current) {
+  // If we need to jump to the bottom (new chat open / new message while at bottom), do it after layout settles.
+  useEffect(() => {
+    if (!shouldScrollToEnd.current || messages.length === 0) return;
+
+    const timer = setTimeout(() => {
       scrollToEnd();
       shouldScrollToEnd.current = false;
-    }
-  }, [messages]);
+    }, 60);
+
+    return () => clearTimeout(timer);
+  }, [messages.length, loading]);
 
   function handleTextChange(text: string) {
     setInputText(text);
@@ -405,6 +420,12 @@ export default function ChatScreen({ navigation, route }: Props) {
         }}
         scrollEventThrottle={100}
         maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+        onContentSizeChange={() => {
+          if (shouldScrollToEnd.current) {
+            scrollToEnd();
+            shouldScrollToEnd.current = false;
+          }
+        }}
       />
 
       {pendingMedia && (

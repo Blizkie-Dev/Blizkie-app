@@ -37,6 +37,11 @@ export async function createOrGetChat(userId: string): Promise<Chat> {
   return res.data;
 }
 
+export async function createGroupChat(name: string, memberIds: string[]): Promise<Chat> {
+  const res = await client.post('/chats/group', { name, memberIds });
+  return res.data;
+}
+
 export async function getChatById(chatId: string): Promise<Chat> {
   const res = await client.get(`/chats/${chatId}`);
   return res.data;

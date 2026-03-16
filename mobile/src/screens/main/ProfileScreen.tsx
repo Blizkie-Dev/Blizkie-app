@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,12 +9,9 @@ import {
   Alert,
   ActivityIndicator,
   Switch,
-  Animated,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
-import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { updateMe, clearPushToken } from '../../api/usersApi';
 import { uploadFile } from '../../api/chatsApi';
 import { useAuthStore, useThemeStore } from '../../store';
@@ -27,7 +24,6 @@ import { useColors } from '../../hooks/useColors';
 export default function ProfileScreen() {
   const { user, updateUser, clearAuth } = useAuthStore();
   const { isDark, toggleTheme } = useThemeStore();
-  const navigation = useNavigation<any>();
   const C = useColors();
   const styles = useMemo(() => createStyles(C), [C]);
 
@@ -35,38 +31,6 @@ export default function ProfileScreen() {
   const [username, setUsername] = useState(user?.username || '');
   const [saving, setSaving] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
-
-  // Swipe right → go back to Chats tab
-  const translateX = useRef(new Animated.Value(0)).current;
-
-  const handleGesture = Animated.event(
-    [{ nativeEvent: { translationX: translateX } }],
-    { useNativeDriver: true }
-  );
-
-  // Cap at 50px so the screen never fully leaves — no blank-screen flash
-  const clampedX = translateX.interpolate({
-    inputRange: [-9999, 0, 50],
-    outputRange: [0, 0, 50],
-    extrapolate: 'clamp',
-  });
-
-  const handleStateChange = ({ nativeEvent }: any) => {
-    const { state, translationX } = nativeEvent;
-    if (state === State.END) {
-      if (translationX > 60) {
-        navigation.navigate('Chats');
-      }
-      Animated.spring(translateX, {
-        toValue: 0,
-        useNativeDriver: true,
-        bounciness: 8,
-        speed: 18,
-      }).start();
-    } else if (state === State.CANCELLED || state === State.FAILED) {
-      Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
-    }
-  };
 
   async function handleChangeAvatar() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -142,13 +106,7 @@ export default function ProfileScreen() {
   const name = user?.display_name || user?.username || '?';
 
   return (
-    <PanGestureHandler
-      onGestureEvent={handleGesture}
-      onHandlerStateChange={handleStateChange}
-      activeOffsetX={[-9999, 30]}
-      failOffsetY={[-15, 15]}
-    >
-      <Animated.View style={[styles.container, { transform: [{ translateX: clampedX }] }]}>
+    <View style={styles.container}>
         <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
           {/* Avatar */}
           <View style={styles.avatarSection}>
@@ -256,8 +214,7 @@ export default function ProfileScreen() {
             <Text style={styles.logoutText}>Выйти из аккаунта</Text>
           </TouchableOpacity>
         </ScrollView>
-      </Animated.View>
-    </PanGestureHandler>
+    </View>
   );
 }
 

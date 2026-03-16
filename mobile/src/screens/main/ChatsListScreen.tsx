@@ -9,17 +9,13 @@ import {
   ActivityIndicator,
   Animated,
   Pressable,
-  Dimensions,
 } from 'react-native';
-import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { getChats, getChatById } from '../../api/chatsApi';
 import { useChatsStore, useAuthStore } from '../../store';
 import ChatListItem from '../../components/ChatListItem';
 import { getSocket, joinChat } from '../../socket/socketClient';
 import { Message } from '../../api/chatsApi';
 import { useColors } from '../../hooks/useColors';
-
-const SCREEN_W = Dimensions.get('window').width;
 
 interface Props {
   navigation: any;
@@ -38,39 +34,6 @@ export default function ChatsListScreen({ navigation }: Props) {
   // FAB animation values
   const animation = useRef(new Animated.Value(0)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
-
-  // Swipe left → Profile tab
-  const translateX = useRef(new Animated.Value(0)).current;
-
-  const handleSwipeGesture = Animated.event(
-    [{ nativeEvent: { translationX: translateX } }],
-    { useNativeDriver: true }
-  );
-
-  // Cap at 50px so the screen never fully leaves — no black-hole flash
-  const clampedX = translateX.interpolate({
-    inputRange: [-50, 0, SCREEN_W],
-    outputRange: [-50, 0, 0],
-    extrapolate: 'clamp',
-  });
-
-  const handleSwipeStateChange = ({ nativeEvent }: any) => {
-    const { state, translationX } = nativeEvent;
-    if (state === State.END) {
-      if (translationX < -60) {
-        if (fabOpen) closeFab();
-        navigation.navigate('Profile');
-      }
-      Animated.spring(translateX, {
-        toValue: 0,
-        useNativeDriver: true,
-        bounciness: 8,
-        speed: 18,
-      }).start();
-    } else if (state === State.CANCELLED || state === State.FAILED) {
-      Animated.spring(translateX, { toValue: 0, useNativeDriver: true }).start();
-    }
-  };
 
   const loadChats = useCallback(async () => {
     try {
@@ -192,13 +155,7 @@ export default function ChatsListScreen({ navigation }: Props) {
   });
 
   return (
-    <PanGestureHandler
-      onGestureEvent={handleSwipeGesture}
-      onHandlerStateChange={handleSwipeStateChange}
-      activeOffsetX={[-30, 30]}
-      failOffsetY={[-15, 15]}
-    >
-      <Animated.View style={[styles.container, { transform: [{ translateX: clampedX }] }]}>
+    <View style={styles.container}>
         <FlatList
           data={sortedChats}
           keyExtractor={(item) => item.id}
@@ -281,8 +238,7 @@ export default function ChatsListScreen({ navigation }: Props) {
             ＋
           </Animated.Text>
         </TouchableOpacity>
-      </Animated.View>
-    </PanGestureHandler>
+    </View>
   );
 }
 

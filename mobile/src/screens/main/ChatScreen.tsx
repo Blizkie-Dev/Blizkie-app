@@ -314,6 +314,7 @@ export default function ChatScreen({ navigation, route }: Props) {
           <MessageBubble
             message={item}
             isMine={item.sender_id === user.id}
+            isGroup={isGroup}
             partnerLastReadAt={isGroup ? 0 : partnerLastReadAt}
             currentUserId={user.id}
             chatMembers={chat.members}

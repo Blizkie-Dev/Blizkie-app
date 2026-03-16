@@ -12,6 +12,7 @@ import {
   Image,
   AppState,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -67,7 +68,7 @@ export default function ChatScreen({ navigation, route }: Props) {
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTyping = useRef(false);
   const isAtBottom = useRef(true);
-  const isInitialLoad = useRef(true);
+  const shouldScrollToEnd = useRef(true);
   const lastMessageIdRef = useRef<string | null>(null);
 
   const isGroup = chat.type === 'group';
@@ -124,6 +125,11 @@ export default function ChatScreen({ navigation, route }: Props) {
   }, [chat.id]);
 
   useEffect(() => {
+    // Reset scroll state when switching chats
+    isAtBottom.current = true;
+    shouldScrollToEnd.current = true;
+    lastMessageIdRef.current = null;
+
     (async () => {
       try {
         const limit = 50;
@@ -139,6 +145,17 @@ export default function ChatScreen({ navigation, route }: Props) {
       }
     })();
   }, [chat.id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      // Ensure we start at the bottom when returning to this screen.
+      shouldScrollToEnd.current = true;
+      const timer = setTimeout(() => {
+        scrollToEnd();
+      }, 100);
+      return () => clearTimeout(timer);
+    }, [chat.id])
+  );
 
   useEffect(() => {
     joinChat(chat.id);
@@ -195,7 +212,7 @@ export default function ChatScreen({ navigation, route }: Props) {
   }, [chat.id]);
 
   function scrollToEnd() {
-    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+    flatListRef.current?.scrollToEnd({ animated: true });
   }
 
   async function loadMoreMessages() {
@@ -228,16 +245,9 @@ export default function ChatScreen({ navigation, route }: Props) {
     const prevLast = lastMessageIdRef.current;
     lastMessageIdRef.current = lastMessageId || null;
 
-    // Initial load: always scroll to bottom
-    if (isInitialLoad.current) {
-      scrollToEnd();
-      isInitialLoad.current = false;
-      return;
-    }
-
     // New message appended: scroll only if we were already at bottom
     if (lastMessageId && lastMessageId !== prevLast && isAtBottom.current) {
-      scrollToEnd();
+      shouldScrollToEnd.current = true;
     }
   }, [messages]);
 
@@ -390,6 +400,12 @@ export default function ChatScreen({ navigation, route }: Props) {
         }}
         scrollEventThrottle={100}
         maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+        onContentSizeChange={() => {
+          if (shouldScrollToEnd.current) {
+            scrollToEnd();
+            shouldScrollToEnd.current = false;
+          }
+        }}
       />
 
       {pendingMedia && (

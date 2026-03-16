@@ -15,6 +15,7 @@ const REACTION_H = 20;
 interface MessageBubbleProps {
   message: Message;
   isMine: boolean;
+  isGroup?: boolean;
   partnerLastReadAt?: number;
   currentUserId?: string;
   chatMembers?: User[];
@@ -35,6 +36,7 @@ function ReadTick({ isRead }: { isRead: boolean }) {
 export default function MessageBubble({
   message,
   isMine,
+  isGroup = false,
   partnerLastReadAt = 0,
   currentUserId,
   chatMembers,
@@ -48,6 +50,9 @@ export default function MessageBubble({
   const isRead = isMine && partnerLastReadAt >= message.created_at;
   const likedBy = message.liked_by || [];
   const hasReaction = likedBy.length > 0;
+
+  const sender = chatMembers?.find((m) => m.id === message.sender_id);
+  const showAvatar = isGroup && !isMine && !!sender;
 
   function handleTap() {
     const now = Date.now();
@@ -68,6 +73,11 @@ export default function MessageBubble({
   return (
     <>
       <View style={[styles.wrapper, isMine ? styles.wrapperRight : styles.wrapperLeft]}>
+        {showAvatar && (
+          <View style={styles.avatarWrapper}>
+            <Avatar uri={sender?.avatar_url} name={sender?.display_name || sender?.username || '?'} size={28} />
+          </View>
+        )}
         <View style={hasReaction ? styles.bubbleWithReaction : undefined}>
           <TouchableOpacity activeOpacity={1} onPress={handleTap}>
             <View style={[styles.bubble, isMine ? styles.bubbleSent : styles.bubbleReceived]}>
@@ -159,9 +169,14 @@ const createStyles = (C: ReturnType<typeof import('../hooks/useColors').useColor
       paddingHorizontal: 12,
       paddingVertical: 2,
       flexDirection: 'row',
+      alignItems: 'flex-end',
     },
     wrapperRight: { justifyContent: 'flex-end' },
     wrapperLeft: { justifyContent: 'flex-start' },
+    avatarWrapper: {
+      marginRight: 8,
+      justifyContent: 'flex-end',
+    },
     bubbleWithReaction: {
       marginBottom: REACTION_H / 2 + 2,
     },

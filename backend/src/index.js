@@ -13,13 +13,17 @@ const usersRoutes = require('./routes/users');
 const chatsRoutes = require('./routes/chats');
 const messagesRoutes = require('./routes/messages');
 const uploadRoutes = require('./routes/upload');
+const adminRoutes = require('./routes/admin');
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
 
 // ─── Middleware ────────────────────────────────────────────────────────────
 app.set('trust proxy', 1);
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: false, // Prevent helmet from blocking our inline admin scripts/styles
+}));
 app.use(cors());
 app.use(express.json());
 
@@ -28,8 +32,10 @@ app.use('/auth', authRoutes);
 app.use('/users', usersRoutes);
 app.use('/chats', chatsRoutes);
 app.use('/chats', messagesRoutes);
+app.use('/admin/api', adminRoutes);
 
-app.use('/uploads', require('express').static(require('path').join(__dirname, '../uploads')));
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+app.use('/admin', express.static(path.join(__dirname, '../public/admin')));
 app.use('/upload', uploadRoutes);
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));

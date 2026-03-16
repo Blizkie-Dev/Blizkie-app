@@ -57,17 +57,22 @@ export default function ChatsListScreen({ navigation }: Props) {
 
     const handler = async (message: Message) => {
       const chatKnown = useChatsStore.getState().chats.some((c) => c.id === message.chat_id);
+      
+      // If we don't know the chat, fetch it
       if (!chatKnown) {
         try {
           const chat = await getChatById(message.chat_id);
-          upsertChat({ ...chat, last_message: message, unread_count: 1 });
+          const isFromMe = message.sender_id === user?.id;
+          upsertChat({ ...chat, last_message: message, unread_count: isFromMe ? 0 : 1 });
           joinChat(message.chat_id);
         } catch {
           loadChats();
         }
         return;
       }
-      if (message.chat_id !== activeChatId) {
+      
+      // If we know the chat, only increment if we aren't currently viewing it AND we didn't send it
+      if (message.chat_id !== activeChatId && message.sender_id !== user?.id) {
         incrementUnread(message.chat_id);
       }
       updateLastMessage(message.chat_id, message);

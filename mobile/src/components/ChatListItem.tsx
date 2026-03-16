@@ -34,7 +34,12 @@ export default function ChatListItem({ chat, currentUserId, onPress }: ChatListI
 
   return (
     <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.7}>
-      <Avatar uri={isGroup ? null : otherMember?.avatar_url} name={isGroup ? '👥' : name} size={52} online={isGroup ? false : isOnline} />
+      <Avatar
+        uri={isGroup ? chat.avatar_url : otherMember?.avatar_url}
+        name={isGroup ? (chat.name || '👥') : name}
+        size={52}
+        online={isGroup ? false : isOnline}
+      />
       <View style={styles.content}>
         <View style={styles.row}>
           <Text style={styles.name} numberOfLines={1}>

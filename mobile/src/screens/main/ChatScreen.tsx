@@ -91,7 +91,11 @@ export default function ChatScreen({ navigation, route }: Props) {
           }}
           activeOpacity={isGroup ? 0.7 : 1}
         >
-          <Avatar uri={isGroup ? null : otherMember?.avatar_url} name={isGroup ? '👥' : chatName} size={36} />
+          <Avatar
+            uri={isGroup ? (currentChat || chat).avatar_url : otherMember?.avatar_url}
+            name={isGroup ? (chatName || '👥') : chatName}
+            size={36}
+          />
           <View style={styles.headerInfo}>
             <Text style={styles.headerName}>{chatName}</Text>
             {isGroup ? (

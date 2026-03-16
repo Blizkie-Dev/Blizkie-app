@@ -152,7 +152,7 @@ export default function ProfileScreen() {
     <PanGestureHandler
       onGestureEvent={handleGesture}
       onHandlerStateChange={handleStateChange}
-      activeOffsetX={[30, 30]}
+      activeOffsetX={[-9999, 30]}
       failOffsetY={[-15, 15]}
     >
       <Animated.View style={[styles.container, { transform: [{ translateX: clampedX }] }]}>

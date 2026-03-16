@@ -46,7 +46,7 @@ export default function ProfileScreen() {
 
   // Cap at 50px so the screen never fully leaves — no blank-screen flash
   const clampedX = translateX.interpolate({
-    inputRange: [-SCREEN_W, 0, 50],
+    inputRange: [-9999, 0, 50],
     outputRange: [0, 0, 50],
     extrapolate: 'clamp',
   });

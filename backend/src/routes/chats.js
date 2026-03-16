@@ -6,6 +6,8 @@ const {
   createGroupChat,
   getChatById,
   markChatAsRead,
+  addChatMember,
+  removeChatMember,
 } = require('../services/chatService');
 
 const router = express.Router();
@@ -78,6 +80,46 @@ router.post('/:id/read', (req, res, next) => {
       });
     }
     res.json({ ok: true, readAt });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /chats/:id/members — add a member (creator only)
+router.post('/:id/members', (req, res, next) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: 'userId is required' });
+    const updatedChat = addChatMember(req.params.id, req.userId, userId);
+    const io = req.app.get('io');
+    if (io) {
+      // Notify existing members that the chat was updated
+      for (const member of updatedChat.members) {
+        io.to(`user:${member.id}`).emit('chat-updated', updatedChat);
+      }
+      // Also notify the newly added user so chat appears in their list
+      io.to(`user:${userId}`).emit('chat-created', updatedChat);
+    }
+    res.json(updatedChat);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// DELETE /chats/:id/members/:userId — remove a member (creator only)
+router.delete('/:id/members/:userId', (req, res, next) => {
+  try {
+    const updatedChat = removeChatMember(req.params.id, req.userId, req.params.userId);
+    const io = req.app.get('io');
+    if (io) {
+      // Notify remaining members of updated member list
+      for (const member of updatedChat.members) {
+        io.to(`user:${member.id}`).emit('chat-updated', updatedChat);
+      }
+      // Notify the removed user so they can remove the chat from their list
+      io.to(`user:${req.params.userId}`).emit('chat-removed', { chatId: req.params.id });
+    }
+    res.json(updatedChat);
   } catch (err) {
     next(err);
   }

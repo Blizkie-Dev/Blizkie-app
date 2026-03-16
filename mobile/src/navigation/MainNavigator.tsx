@@ -20,6 +20,7 @@ import ChatsListScreen from '../screens/main/ChatsListScreen';
 import ChatScreen from '../screens/main/ChatScreen';
 import SearchUsersScreen from '../screens/main/SearchUsersScreen';
 import CreateGroupScreen from '../screens/main/CreateGroupScreen';
+import GroupInfoScreen from '../screens/main/GroupInfoScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import { useColors } from '../hooks/useColors';
 
@@ -42,6 +43,7 @@ function ChatsStackNavigator() {
       <ChatsStack.Screen name="Chat" component={ChatScreen as any} options={{ title: '', gestureEnabled: true }} />
       <ChatsStack.Screen name="SearchUsers" component={SearchUsersScreen} options={{ title: 'Новый чат' }} />
       <ChatsStack.Screen name="CreateGroup" component={CreateGroupScreen} options={{ title: 'Новая группа' }} />
+      <ChatsStack.Screen name="GroupInfo" component={GroupInfoScreen as any} options={{ title: 'Информация о группе' }} />
     </ChatsStack.Navigator>
   );
 }

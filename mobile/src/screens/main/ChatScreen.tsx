@@ -51,7 +51,7 @@ export default function ChatScreen({ navigation, route }: Props) {
   const headerHeight = useHeaderHeight();
   const user = useAuthStore((s) => s.user)!;
   const { messagesByChatId, setMessages, addMessage, prependMessages, updateMessageReaction } = useMessagesStore();
-  const { updateLastMessage, markChatRead, setActiveChatId, setPartnerReadAt, chats } = useChatsStore();
+  const { updateLastMessage, markChatRead, setActiveChatId, setPartnerReadAt, chats, upsertChat } = useChatsStore();
   const currentChat = chats.find((c) => c.id === chat.id);
   const partnerLastReadAt = currentChat?.partner_last_read_at || 0;
   const C = useColors();
@@ -84,13 +84,19 @@ export default function ChatScreen({ navigation, route }: Props) {
   useEffect(() => {
     navigation.setOptions({
       headerTitle: () => (
-        <TouchableOpacity style={styles.headerTitle}>
+        <TouchableOpacity
+          style={styles.headerTitle}
+          onPress={() => {
+            if (isGroup) navigation.push('GroupInfo', { chat: currentChat || chat });
+          }}
+          activeOpacity={isGroup ? 0.7 : 1}
+        >
           <Avatar uri={isGroup ? null : otherMember?.avatar_url} name={isGroup ? '👥' : chatName} size={36} />
           <View style={styles.headerInfo}>
             <Text style={styles.headerName}>{chatName}</Text>
             {isGroup ? (
               <Text style={styles.headerStatus}>
-                {chat.members.length} участника
+                {(currentChat || chat).members.length} участника
               </Text>
             ) : (
               <Text style={[styles.headerStatus, partnerIsOnline && styles.headerStatusOnline]}>
@@ -102,10 +108,11 @@ export default function ChatScreen({ navigation, route }: Props) {
               </Text>
             )}
           </View>
+          {isGroup && <Ionicons name="chevron-forward" size={16} color={C.textSecondary} style={{ marginLeft: 2 }} />}
         </TouchableOpacity>
       ),
     });
-  }, [chatName, otherMember, partnerIsOnline, isGroup, styles]);
+  }, [chatName, otherMember, partnerIsOnline, isGroup, styles, currentChat]);
 
   useEffect(() => {
     setActiveChatId(chat.id);
@@ -206,12 +213,28 @@ export default function ChatScreen({ navigation, route }: Props) {
     socket.on('chat-read', onChatRead);
     socket.on('message-reaction', onReaction);
 
+    // Real-time member management events
+    const onChatUpdated = (updatedChat: any) => {
+      if (updatedChat.id === chat.id) {
+        upsertChat(updatedChat);
+      }
+    };
+    const onChatRemoved = ({ chatId }: { chatId: string }) => {
+      if (chatId === chat.id) {
+        navigation.goBack();
+      }
+    };
+    socket.on('chat-updated', onChatUpdated);
+    socket.on('chat-removed', onChatRemoved);
+
     return () => {
       socket.off('new-message', onNewMessage);
       socket.off('user-typing', onTyping);
       socket.off('user-stopped-typing', onStopTyping);
       socket.off('chat-read', onChatRead);
       socket.off('message-reaction', onReaction);
+      socket.off('chat-updated', onChatUpdated);
+      socket.off('chat-removed', onChatRemoved);
     };
   }, [chat.id]);
 

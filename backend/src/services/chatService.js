@@ -122,7 +122,7 @@ function createGroupChat(name, creatorId, memberIds) {
 
   db.exec('BEGIN');
   try {
-    db.prepare('INSERT INTO chats (id, type, name, created_at) VALUES (?, ?, ?, ?)').run([chatId, 'group', name.trim(), now]);
+    db.prepare('INSERT INTO chats (id, type, name, creator_id, created_at) VALUES (?, ?, ?, ?, ?)').run([chatId, 'group', name.trim(), creatorId, now]);
     for (const memberId of allMembers) {
       db.prepare('INSERT INTO chat_members (chat_id, user_id, joined_at) VALUES (?, ?, ?)').run([chatId, memberId, now]);
     }
@@ -194,7 +194,40 @@ function getChatById(chatId, userId) {
     .all(chatId)
     .map(sanitizeUser);
 
-  return { ...chat, members };
+  return { ...chat, members, creator_id: chat.creator_id || null };
+}
+
+/**
+ * Adds a new member to a group chat. Only the creator can do this.
+ */
+function addChatMember(chatId, requesterId, newUserId) {
+  const db = getDb();
+  const chat = db.prepare('SELECT * FROM chats WHERE id = ? AND type = ?').get([chatId, 'group']);
+  if (!chat) throw Object.assign(new Error('Group chat not found'), { status: 404 });
+  if (chat.creator_id !== requesterId) throw Object.assign(new Error('Only the creator can add members'), { status: 403 });
+
+  const alreadyMember = db.prepare('SELECT 1 FROM chat_members WHERE chat_id = ? AND user_id = ?').get([chatId, newUserId]);
+  if (alreadyMember) throw Object.assign(new Error('User is already a member'), { status: 409 });
+
+  const newUser = db.prepare('SELECT id FROM users WHERE id = ?').get(newUserId);
+  if (!newUser) throw Object.assign(new Error('User not found'), { status: 404 });
+
+  db.prepare('INSERT INTO chat_members (chat_id, user_id, joined_at) VALUES (?, ?, ?)').run([chatId, newUserId, Date.now()]);
+  return getChatById(chatId, requesterId);
+}
+
+/**
+ * Removes a member from a group chat. Only the creator can do this. Creator cannot remove themselves.
+ */
+function removeChatMember(chatId, requesterId, targetUserId) {
+  const db = getDb();
+  const chat = db.prepare('SELECT * FROM chats WHERE id = ? AND type = ?').get([chatId, 'group']);
+  if (!chat) throw Object.assign(new Error('Group chat not found'), { status: 404 });
+  if (chat.creator_id !== requesterId) throw Object.assign(new Error('Only the creator can remove members'), { status: 403 });
+  if (targetUserId === requesterId) throw Object.assign(new Error('Creator cannot remove themselves'), { status: 400 });
+
+  db.prepare('DELETE FROM chat_members WHERE chat_id = ? AND user_id = ?').run([chatId, targetUserId]);
+  return getChatById(chatId, requesterId);
 }
 
 // ─── Messages ──────────────────────────────────────────────────────────────
@@ -336,4 +369,6 @@ module.exports = {
   updateUser,
   sanitizeUser,
   toggleReaction,
+  addChatMember,
+  removeChatMember,
 };

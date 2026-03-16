@@ -78,11 +78,25 @@ export default function ChatsListScreen({ navigation }: Props) {
       joinChat(chat.id);
     };
 
+    const onChatUpdated = (chat: any) => {
+      upsertChat(chat);
+    };
+
+    const onChatRemoved = ({ chatId }: { chatId: string }) => {
+      // Remove from the store by filtering it out
+      const { chats, setChats } = useChatsStore.getState();
+      setChats(chats.filter((c) => c.id !== chatId));
+    };
+
     socket.on('new-message', handler);
     socket.on('chat-created', onChatCreated);
+    socket.on('chat-updated', onChatUpdated);
+    socket.on('chat-removed', onChatRemoved);
     return () => {
       socket.off('new-message', handler);
       socket.off('chat-created', onChatCreated);
+      socket.off('chat-updated', onChatUpdated);
+      socket.off('chat-removed', onChatRemoved);
     };
   }, []);
 

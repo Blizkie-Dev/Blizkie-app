@@ -21,6 +21,7 @@ export interface Chat {
   type: 'direct' | 'group';
   name: string | null;
   created_at: number;
+  creator_id: string | null;
   members: User[];
   last_message: Message | null;
   unread_count: number;
@@ -97,5 +98,15 @@ export async function reactToMessage(
   messageId: string
 ): Promise<{ liked_by: string[] }> {
   const res = await client.post(`/chats/${chatId}/messages/${messageId}/react`);
+  return res.data;
+}
+
+export async function addChatMember(chatId: string, userId: string): Promise<Chat> {
+  const res = await client.post(`/chats/${chatId}/members`, { userId });
+  return res.data;
+}
+
+export async function removeChatMember(chatId: string, userId: string): Promise<Chat> {
+  const res = await client.delete(`/chats/${chatId}/members/${userId}`);
   return res.data;
 }

@@ -91,6 +91,12 @@ function runMigrations() {
     db.exec("ALTER TABLE messages ADD COLUMN liked_by TEXT NOT NULL DEFAULT '[]'");
   } catch { /* already exists */ }
 
+  // Add creator_id to group chats for member management
+  try {
+    db.exec('ALTER TABLE chats ADD COLUMN creator_id TEXT');
+  } catch { /* already exists */ }
+
+
   console.log('[DB] Migrations complete');
 }
 

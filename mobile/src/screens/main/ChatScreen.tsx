@@ -11,6 +11,7 @@ import {
   Alert,
   Image,
   AppState,
+  InteractionManager,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
@@ -69,6 +70,7 @@ export default function ChatScreen({ navigation, route }: Props) {
   const isTyping = useRef(false);
   const isAtBottom = useRef(true);
   const shouldScrollToEnd = useRef(true);
+  const initialScrollDone = useRef(false);
   const lastMessageIdRef = useRef<string | null>(null);
 
   const isGroup = chat.type === 'group';
@@ -128,6 +130,7 @@ export default function ChatScreen({ navigation, route }: Props) {
     // Reset scroll state when switching chats
     isAtBottom.current = true;
     shouldScrollToEnd.current = true;
+    initialScrollDone.current = false;
     lastMessageIdRef.current = null;
 
     (async () => {
@@ -150,10 +153,13 @@ export default function ChatScreen({ navigation, route }: Props) {
     useCallback(() => {
       // Ensure we start at the newest message when returning to this screen.
       shouldScrollToEnd.current = true;
-      const timer = setTimeout(() => {
-        scrollToEnd();
-      }, 100);
-      return () => clearTimeout(timer);
+      initialScrollDone.current = false;
+
+      const interaction = InteractionManager.runAfterInteractions(() => {
+        scrollToEnd(false);
+      });
+
+      return () => interaction.cancel?.();
     }, [chat.id])
   );
 
@@ -211,15 +217,15 @@ export default function ChatScreen({ navigation, route }: Props) {
     };
   }, [chat.id]);
 
-  function scrollToEnd() {
+  function scrollToEnd(animated = true) {
     const lastIndex = messages.length - 1;
     if (lastIndex < 0) return;
 
     try {
-      flatListRef.current?.scrollToIndex({ index: lastIndex, animated: true });
+      flatListRef.current?.scrollToIndex({ index: lastIndex, animated });
     } catch (err) {
       // scrollToIndex can throw if the item is not rendered yet; fallback to scrollToEnd
-      flatListRef.current?.scrollToEnd({ animated: true } as any);
+      flatListRef.current?.scrollToEnd({ animated } as any);
     }
   }
 
@@ -263,12 +269,12 @@ export default function ChatScreen({ navigation, route }: Props) {
   useEffect(() => {
     if (!shouldScrollToEnd.current || messages.length === 0) return;
 
-    const timer = setTimeout(() => {
-      scrollToEnd();
+    const interaction = InteractionManager.runAfterInteractions(() => {
+      scrollToEnd(false);
       shouldScrollToEnd.current = false;
-    }, 60);
+    });
 
-    return () => clearTimeout(timer);
+    return () => interaction.cancel?.();
   }, [messages.length, loading]);
 
   function handleTextChange(text: string) {
@@ -422,8 +428,9 @@ export default function ChatScreen({ navigation, route }: Props) {
         maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
         onContentSizeChange={() => {
           if (shouldScrollToEnd.current) {
-            scrollToEnd();
+            scrollToEnd(false);
             shouldScrollToEnd.current = false;
+            initialScrollDone.current = true;
           }
         }}
       />

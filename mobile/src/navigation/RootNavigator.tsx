@@ -9,7 +9,7 @@ import { connectSocket, disconnectSocket, getSocket } from '../socket/socketClie
 import { useColors } from '../hooks/useColors';
 
 interface Props {
-  navigationRef?: React.RefObject<NavigationContainerRef<any>>;
+  navigationRef?: React.RefObject<NavigationContainerRef<any> | null>;
 }
 
 export default function RootNavigator({ navigationRef }: Props) {

@@ -10,7 +10,7 @@ import { useAuthStore, useThemeStore } from './src/store';
 import { getChatById } from './src/api/chatsApi';
 
 async function navigateToChat(
-  navigationRef: React.RefObject<NavigationContainerRef<any>>,
+  navigationRef: React.RefObject<NavigationContainerRef<any> | null>,
   chatId: string
 ) {
   if (!navigationRef.current) return;
@@ -28,7 +28,7 @@ async function navigateToChat(
 export default function App() {
   const token = useAuthStore((s) => s.token);
   const listenerRef = useRef<Notifications.Subscription | null>(null);
-  const navigationRef = useRef<NavigationContainerRef<any>>(null);
+  const navigationRef = useRef<NavigationContainerRef<any> | null>(null);
   const isDark = useThemeStore((s) => s.isDark);
   const initTheme = useThemeStore((s) => s.initTheme);
 

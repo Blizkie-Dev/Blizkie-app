@@ -31,7 +31,7 @@ export default function AuthNavigator() {
       <Stack.Screen
         name="SetupProfile"
         component={SetupProfileScreen as any}
-        options={{ title: 'Профиль', headerBackVisible: false }}
+        options={{ title: 'Профиль' }}
       />
     </Stack.Navigator>
   );

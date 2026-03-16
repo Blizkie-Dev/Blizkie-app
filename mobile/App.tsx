@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
 import { NavigationContainerRef } from '@react-navigation/native';
@@ -61,8 +62,10 @@ export default function App() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <StatusBar style={isDark ? 'light' : 'dark'} />
-      <RootNavigator navigationRef={navigationRef} />
+      <SafeAreaProvider>
+        <StatusBar style={isDark ? 'light' : 'dark'} />
+        <RootNavigator navigationRef={navigationRef} />
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }

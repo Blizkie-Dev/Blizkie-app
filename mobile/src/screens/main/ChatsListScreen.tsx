@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useRef, useState } from 'react';
 import {
   View,
   FlatList,
@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
+  Animated,
+  Pressable,
 } from 'react-native';
 import { Colors } from '../../constants/colors';
 import { getChats, getChatById } from '../../api/chatsApi';
@@ -24,6 +26,11 @@ export default function ChatsListScreen({ navigation }: Props) {
   const user = useAuthStore((s) => s.user);
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
+  const [fabOpen, setFabOpen] = useState(false);
+
+  // Animation values
+  const animation = useRef(new Animated.Value(0)).current;
+  const rotateAnim = useRef(new Animated.Value(0)).current;
 
   const loadChats = useCallback(async () => {
     try {
@@ -49,13 +56,11 @@ export default function ChatsListScreen({ navigation }: Props) {
     const handler = async (message: Message) => {
       const chatKnown = useChatsStore.getState().chats.some((c) => c.id === message.chat_id);
       if (!chatKnown) {
-        // New chat from another user — fetch full chat and add to list
         try {
           const chat = await getChatById(message.chat_id);
           upsertChat({ ...chat, last_message: message, unread_count: 1 });
           joinChat(message.chat_id);
         } catch {
-          // If fetch fails just reload all chats
           loadChats();
         }
         return;
@@ -66,9 +71,76 @@ export default function ChatsListScreen({ navigation }: Props) {
       updateLastMessage(message.chat_id, message);
     };
 
+    const onChatCreated = (chat: any) => {
+      upsertChat(chat);
+      joinChat(chat.id);
+    };
+
     socket.on('new-message', handler);
-    return () => { socket.off('new-message', handler); };
+    socket.on('chat-created', onChatCreated);
+    return () => {
+      socket.off('new-message', handler);
+      socket.off('chat-created', onChatCreated);
+    };
   }, []);
+
+  function toggleFab() {
+    const toValue = fabOpen ? 0 : 1;
+    Animated.parallel([
+      Animated.spring(animation, {
+        toValue,
+        useNativeDriver: true,
+        bounciness: 12,
+        speed: 14,
+      }),
+      Animated.spring(rotateAnim, {
+        toValue,
+        useNativeDriver: true,
+        bounciness: 8,
+        speed: 14,
+      }),
+    ]).start();
+    setFabOpen(!fabOpen);
+  }
+
+  function closeFab() {
+    Animated.parallel([
+      Animated.spring(animation, {
+        toValue: 0,
+        useNativeDriver: true,
+        bounciness: 8,
+        speed: 18,
+      }),
+      Animated.spring(rotateAnim, {
+        toValue: 0,
+        useNativeDriver: true,
+        bounciness: 8,
+        speed: 18,
+      }),
+    ]).start();
+    setFabOpen(false);
+  }
+
+  // Sub-button 1 (direct chat) — closer to main FAB
+  const translateY1 = animation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -76],
+  });
+  // Sub-button 2 (group) — further
+  const translateY2 = animation.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -144],
+  });
+
+  const opacity = animation.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [0, 0, 1],
+  });
+
+  const rotate = rotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '45deg'],
+  });
 
   if (loading) {
     return (
@@ -101,7 +173,7 @@ export default function ChatsListScreen({ navigation }: Props) {
             <Text style={styles.emptyIcon}>💬</Text>
             <Text style={styles.emptyTitle}>Нет чатов</Text>
             <Text style={styles.emptySubtitle}>
-              Нажмите на карандаш, чтобы начать общение
+              Нажмите +, чтобы начать общение
             </Text>
           </View>
         }
@@ -118,12 +190,56 @@ export default function ChatsListScreen({ navigation }: Props) {
         contentContainerStyle={sortedChats.length === 0 ? styles.emptyList : undefined}
       />
 
+      {/* Backdrop — closes FAB when tapping outside */}
+      {fabOpen && (
+        <Pressable style={styles.backdrop} onPress={closeFab} />
+      )}
+
+      {/* Sub-button: group chat */}
+      <Animated.View
+        style={[
+          styles.subFabContainer,
+          { transform: [{ translateY: translateY2 }], opacity },
+        ]}
+        pointerEvents={fabOpen ? 'auto' : 'none'}
+      >
+        <Text style={styles.subFabLabel}>Группа</Text>
+        <TouchableOpacity
+          style={[styles.fab, styles.subFab]}
+          onPress={() => { closeFab(); navigation.navigate('CreateGroup'); }}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.fabIcon}>👥</Text>
+        </TouchableOpacity>
+      </Animated.View>
+
+      {/* Sub-button: direct chat */}
+      <Animated.View
+        style={[
+          styles.subFabContainer,
+          { transform: [{ translateY: translateY1 }], opacity },
+        ]}
+        pointerEvents={fabOpen ? 'auto' : 'none'}
+      >
+        <Text style={styles.subFabLabel}>Личный чат</Text>
+        <TouchableOpacity
+          style={[styles.fab, styles.subFab]}
+          onPress={() => { closeFab(); navigation.navigate('SearchUsers'); }}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.fabIcon}>✏️</Text>
+        </TouchableOpacity>
+      </Animated.View>
+
+      {/* Main FAB */}
       <TouchableOpacity
         style={styles.fab}
-        onPress={() => navigation.navigate('SearchUsers')}
+        onPress={toggleFab}
         activeOpacity={0.85}
       >
-        <Text style={styles.fabIcon}>✏️</Text>
+        <Animated.Text style={[styles.fabIcon, { transform: [{ rotate }] }]}>
+          ＋
+        </Animated.Text>
       </TouchableOpacity>
     </View>
   );
@@ -165,6 +281,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 21,
   },
+  backdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
   fab: {
     position: 'absolute',
     right: 20,
@@ -181,7 +304,35 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
   },
+  subFab: {
+    position: 'relative',
+    right: 0,
+    bottom: 0,
+  },
+  subFabContainer: {
+    position: 'absolute',
+    right: 20,
+    bottom: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  subFabLabel: {
+    backgroundColor: Colors.background,
+    color: Colors.text,
+    fontSize: 14,
+    fontWeight: '500',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+  },
   fabIcon: {
     fontSize: 22,
+    color: '#fff',
   },
 });

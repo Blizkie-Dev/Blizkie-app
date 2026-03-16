@@ -4,8 +4,9 @@ import { NavigationContainer, NavigationContainerRef } from '@react-navigation/n
 import AuthNavigator from './AuthNavigator';
 import MainNavigator from './MainNavigator';
 import { useAuthStore, useOnlineStore, useChatsStore, useMessagesStore } from '../store';
-import { getToken, getSavedUser } from '../utils/storage';
+import { getToken, getSavedUser, saveUser } from '../utils/storage';
 import { connectSocket, disconnectSocket, getSocket } from '../socket/socketClient';
+import { getMe } from '../api/usersApi';
 import { useColors } from '../hooks/useColors';
 
 interface Props {
@@ -13,7 +14,7 @@ interface Props {
 }
 
 export default function RootNavigator({ navigationRef }: Props) {
-  const { isAuthenticated, setAuth } = useAuthStore();
+  const { isAuthenticated, setAuth, updateUser } = useAuthStore();
   const [bootstrapping, setBootstrapping] = useState(true);
   const C = useColors();
 
@@ -25,6 +26,11 @@ export default function RootNavigator({ navigationRef }: Props) {
         if (token && user) {
           setAuth(user as any, token);
           connectSocket(token);
+          // Refresh user data from server in background to avoid stale avatar/profile
+          getMe().then((fresh) => {
+            updateUser(fresh);
+            saveUser(fresh).catch(() => {});
+          }).catch(() => {});
         }
       } catch (err) {
         console.error('Bootstrap error', err);

@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { updateMe, clearPushToken } from '../../api/usersApi';
 import { uploadFile } from '../../api/chatsApi';
 import { useAuthStore, useThemeStore } from '../../store';
-import { clearStorage } from '../../utils/storage';
+import { clearStorage, saveUser } from '../../utils/storage';
 import { compressImage } from '../../utils/imageUtils';
 import { disconnectSocket } from '../../socket/socketClient';
 import Avatar from '../../components/Avatar';
@@ -54,6 +54,7 @@ export default function ProfileScreen() {
       const uploaded = await uploadFile(compressedUri, filename, mimeType);
       const updated = await updateMe({ avatar_url: uploaded.url });
       updateUser(updated);
+      await saveUser(updated);
     } catch (err: any) {
       console.error('Avatar upload error:', err);
       Alert.alert('Ошибка загрузки', err?.message || String(err));
@@ -74,6 +75,7 @@ export default function ProfileScreen() {
         username: username.trim() || null,
       });
       updateUser(updated);
+      await saveUser(updated);
       Alert.alert('Готово', 'Профиль сохранён');
     } catch (err: any) {
       const msg = err?.response?.data?.error || 'Не удалось сохранить';

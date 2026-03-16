@@ -38,12 +38,14 @@ router.post('/:chatId/messages', (req, res, next) => {
     const db = getDb();
     const members = db
       .prepare(
-        `SELECT u.id, u.push_token, u.display_name
+        `SELECT u.id, u.push_token, u.display_name, u.avatar_url
          FROM chat_members cm JOIN users u ON u.id = cm.user_id
          WHERE cm.chat_id = ?`
       )
       .all(req.params.chatId);
 
+    const chat = db.prepare('SELECT type, name FROM chats WHERE id = ?').get(req.params.chatId);
+    const isGroup = chat?.type === 'group';
     const sender = members.find((m) => m.id === req.userId);
     const senderName = sender?.display_name || 'Новое сообщение';
 
@@ -61,11 +63,14 @@ router.post('/:chatId/messages', (req, res, next) => {
       if (member.id === req.userId) continue;
       if (userActiveChat.get(member.id) === req.params.chatId) continue;
       if (member.push_token) {
-        const pushText = msg.text || (msg.attachment_type === 'image' ? '📷 Фото' : '📎 Файл');
-        sendMessagePush(member.push_token, senderName, pushText, {
-          chatId: req.params.chatId,
-          senderId: req.userId,
-        }).catch(() => {});
+        const msgText = msg.text || (msg.attachment_type === 'image' ? '📷 Фото' : '📎 Файл');
+        const pushTitle = isGroup ? (chat.name || 'Группа') : senderName;
+        const pushBody = isGroup ? `${senderName}: ${msgText}` : msgText;
+        sendMessagePush(
+          member.push_token,
+          { title: pushTitle, body: pushBody, imageUrl: sender?.avatar_url || null },
+          { chatId: req.params.chatId, senderId: req.userId }
+        ).catch(() => {});
       }
     }
 

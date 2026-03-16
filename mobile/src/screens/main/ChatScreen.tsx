@@ -58,6 +58,7 @@ export default function ChatScreen({ navigation, route }: Props) {
   const styles = useMemo(() => createStyles(C), [C]);
 
   const messages = messagesByChatId[chat.id] || [];
+  const invertedMessages = useMemo(() => [...messages].reverse(), [messages]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -68,9 +69,8 @@ export default function ChatScreen({ navigation, route }: Props) {
   const flatListRef = useRef<FlatList>(null);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTyping = useRef(false);
-  const isAtBottom = useRef(true);
+  const isAtBottom = useRef(true); // in inverted list, bottom = newest
   const shouldScrollToEnd = useRef(true);
-  const initialScrollDone = useRef(false);
   const lastMessageIdRef = useRef<string | null>(null);
 
   const isGroup = chat.type === 'group';
@@ -130,7 +130,6 @@ export default function ChatScreen({ navigation, route }: Props) {
     // Reset scroll state when switching chats
     isAtBottom.current = true;
     shouldScrollToEnd.current = true;
-    initialScrollDone.current = false;
     lastMessageIdRef.current = null;
 
     (async () => {
@@ -153,10 +152,9 @@ export default function ChatScreen({ navigation, route }: Props) {
     useCallback(() => {
       // Ensure we start at the newest message when returning to this screen.
       shouldScrollToEnd.current = true;
-      initialScrollDone.current = false;
 
       const interaction = InteractionManager.runAfterInteractions(() => {
-        forceScrollToEnd();
+        scrollToNewest(false);
       });
 
       return () => interaction.cancel?.();
@@ -172,7 +170,7 @@ export default function ChatScreen({ navigation, route }: Props) {
       if (msg.chat_id === chat.id) {
         addMessage(chat.id, msg);
         updateLastMessage(chat.id, msg);
-        scrollToEnd();
+        scrollToNewest();
         markChatAsRead(chat.id).catch(() => {});
         markChatRead(chat.id);
       }
@@ -217,23 +215,15 @@ export default function ChatScreen({ navigation, route }: Props) {
     };
   }, [chat.id]);
 
-  function scrollToEnd(animated = true) {
-    const lastIndex = messages.length - 1;
-    if (lastIndex < 0) return;
-
+  function scrollToNewest(animated = true) {
+    // With inverted FlatList, newest message is at index 0.
     try {
-      flatListRef.current?.scrollToIndex({ index: lastIndex, animated });
+      flatListRef.current?.scrollToIndex({ index: 0, animated });
     } catch (err) {
-      // scrollToIndex can throw if the item is not rendered yet. Use offset fallback.
-      flatListRef.current?.scrollToOffset({ offset: 9999999, animated });
+      flatListRef.current?.scrollToOffset({ offset: 0, animated });
     }
   }
 
-  function forceScrollToEnd() {
-    scrollToEnd(false);
-    // Ensure we land in the bottom even if first attempt runs too early.
-    setTimeout(() => scrollToEnd(false), 50);
-  }
 
   async function loadMoreMessages() {
     if (!hasMore || loadingMore || loading) return;
@@ -271,12 +261,12 @@ export default function ChatScreen({ navigation, route }: Props) {
     }
   }, [messages]);
 
-  // If we need to jump to the bottom (new chat open / new message while at bottom), do it after layout settles.
+  // If we need to jump to the bottom (new message while at bottom), do it after layout settles.
   useEffect(() => {
     if (!shouldScrollToEnd.current || messages.length === 0) return;
 
     const interaction = InteractionManager.runAfterInteractions(() => {
-      forceScrollToEnd();
+      scrollToNewest(true);
       shouldScrollToEnd.current = false;
     });
 
@@ -314,7 +304,7 @@ export default function ChatScreen({ navigation, route }: Props) {
         updateLastMessage(chat.id, msg);
         setPendingMedia(null);
         setInputText('');
-        scrollToEnd();
+        scrollToNewest();
       } catch (err) {
         console.error('Failed to send attachment', err);
         Alert.alert('Ошибка', 'Не удалось отправить файл');
@@ -336,7 +326,7 @@ export default function ChatScreen({ navigation, route }: Props) {
       const msg = await sendMessage(chat.id, text);
       addMessage(chat.id, msg);
       updateLastMessage(chat.id, msg);
-      scrollToEnd();
+      scrollToNewest();
     } catch (err) {
       console.error('Failed to send message', err);
       setInputText(text);
@@ -396,7 +386,8 @@ export default function ChatScreen({ navigation, route }: Props) {
     >
       <FlatList
         ref={flatListRef}
-        data={messages}
+        data={invertedMessages}
+        inverted
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <MessageBubble
@@ -422,21 +413,20 @@ export default function ChatScreen({ navigation, route }: Props) {
         contentContainerStyle={styles.messagesList}
         onScroll={({ nativeEvent }) => {
           const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
-          const distanceFromBottom =
-            contentSize.height - (contentOffset.y + layoutMeasurement.height);
-          isAtBottom.current = distanceFromBottom < 120;
 
-          if (contentOffset.y < 80) {
+          // Inverted list: newest messages are at the top (offset 0).
+          isAtBottom.current = contentOffset.y < 120;
+
+          const isNearOldest =
+            contentOffset.y + layoutMeasurement.height >= contentSize.height - 80;
+          if (isNearOldest) {
             loadMoreMessages();
           }
         }}
         scrollEventThrottle={100}
-        onContentSizeChange={() => {
-          if (shouldScrollToEnd.current) {
-            forceScrollToEnd();
-            shouldScrollToEnd.current = false;
-            initialScrollDone.current = true;
-          }
+        onScrollToIndexFailed={() => {
+          // Fallback for cases where the list isn't ready yet
+          scrollToNewest(false);
         }}
       />
 

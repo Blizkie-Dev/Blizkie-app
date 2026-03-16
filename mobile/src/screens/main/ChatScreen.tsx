@@ -156,7 +156,7 @@ export default function ChatScreen({ navigation, route }: Props) {
       initialScrollDone.current = false;
 
       const interaction = InteractionManager.runAfterInteractions(() => {
-        scrollToEnd(false);
+        forceScrollToEnd();
       });
 
       return () => interaction.cancel?.();
@@ -224,9 +224,15 @@ export default function ChatScreen({ navigation, route }: Props) {
     try {
       flatListRef.current?.scrollToIndex({ index: lastIndex, animated });
     } catch (err) {
-      // scrollToIndex can throw if the item is not rendered yet; fallback to scrollToEnd
-      flatListRef.current?.scrollToEnd({ animated } as any);
+      // scrollToIndex can throw if the item is not rendered yet. Use offset fallback.
+      flatListRef.current?.scrollToOffset({ offset: 9999999, animated });
     }
+  }
+
+  function forceScrollToEnd() {
+    scrollToEnd(false);
+    // Ensure we land in the bottom even if first attempt runs too early.
+    setTimeout(() => scrollToEnd(false), 50);
   }
 
   async function loadMoreMessages() {
@@ -270,7 +276,7 @@ export default function ChatScreen({ navigation, route }: Props) {
     if (!shouldScrollToEnd.current || messages.length === 0) return;
 
     const interaction = InteractionManager.runAfterInteractions(() => {
-      scrollToEnd(false);
+      forceScrollToEnd();
       shouldScrollToEnd.current = false;
     });
 
@@ -425,10 +431,9 @@ export default function ChatScreen({ navigation, route }: Props) {
           }
         }}
         scrollEventThrottle={100}
-        maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
         onContentSizeChange={() => {
           if (shouldScrollToEnd.current) {
-            scrollToEnd(false);
+            forceScrollToEnd();
             shouldScrollToEnd.current = false;
             initialScrollDone.current = true;
           }

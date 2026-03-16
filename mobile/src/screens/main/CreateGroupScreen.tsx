@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,13 +9,13 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { Colors } from '../../constants/colors';
 import { searchUsers } from '../../api/usersApi';
 import { createGroupChat } from '../../api/chatsApi';
 import { User } from '../../api/authApi';
 import { useChatsStore } from '../../store';
 import Avatar from '../../components/Avatar';
 import { joinChat } from '../../socket/socketClient';
+import { useColors } from '../../hooks/useColors';
 
 interface Props {
   navigation: any;
@@ -30,6 +30,8 @@ export default function CreateGroupScreen({ navigation }: Props) {
   const [creating, setCreating] = useState(false);
   const { upsertChat } = useChatsStore();
   const searchTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const C = useColors();
+  const styles = useMemo(() => createStyles(C), [C]);
 
   function handleSearch(text: string) {
     setQuery(text);
@@ -83,20 +85,18 @@ export default function CreateGroupScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      {/* Group name input */}
       <View style={styles.nameSection}>
         <TextInput
           style={styles.nameInput}
           value={groupName}
           onChangeText={setGroupName}
           placeholder="Название группы"
-          placeholderTextColor={Colors.textLight}
+          placeholderTextColor={C.textLight}
           maxLength={64}
           returnKeyType="next"
         />
       </View>
 
-      {/* Selected members chips */}
       {selected.length > 0 && (
         <View style={styles.chipsSection}>
           <FlatList
@@ -121,7 +121,6 @@ export default function CreateGroupScreen({ navigation }: Props) {
           : `Участников: ${selected.length}`}
       </Text>
 
-      {/* User search */}
       <View style={styles.searchBar}>
         <Text style={styles.searchIcon}>🔍</Text>
         <TextInput
@@ -129,14 +128,14 @@ export default function CreateGroupScreen({ navigation }: Props) {
           value={query}
           onChangeText={handleSearch}
           placeholder="Добавить участника..."
-          placeholderTextColor={Colors.textLight}
+          placeholderTextColor={C.textLight}
           autoCapitalize="none"
           autoCorrect={false}
           clearButtonMode="while-editing"
         />
       </View>
 
-      {searching && <ActivityIndicator color={Colors.primary} style={{ marginTop: 12 }} />}
+      {searching && <ActivityIndicator color={C.primary} style={{ marginTop: 12 }} />}
 
       <FlatList
         data={results}
@@ -170,7 +169,6 @@ export default function CreateGroupScreen({ navigation }: Props) {
         }
       />
 
-      {/* Create button */}
       <TouchableOpacity
         style={[styles.createButton, !canCreate && styles.createButtonDisabled]}
         onPress={handleCreate}
@@ -187,140 +185,141 @@ export default function CreateGroupScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  nameSection: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
-  nameInput: {
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: Colors.text,
-    backgroundColor: Colors.backgroundSecondary,
-  },
-  chipsSection: {
-    paddingVertical: 8,
-  },
-  chips: {
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.primary + '20',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    gap: 6,
-  },
-  chipText: {
-    fontSize: 13,
-    color: Colors.primary,
-    fontWeight: '500',
-    maxWidth: 100,
-  },
-  chipRemove: {
-    fontSize: 11,
-    color: Colors.primary,
-  },
-  hint: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-  },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 16,
-    marginBottom: 4,
-    paddingHorizontal: 14,
-    backgroundColor: Colors.backgroundSecondary,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    height: 44,
-  },
-  searchIcon: {
-    fontSize: 16,
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: Colors.text,
-  },
-  userRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-    gap: 12,
-  },
-  userInfo: {
-    flex: 1,
-  },
-  userName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: Colors.text,
-  },
-  userHandle: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxSelected: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  checkmark: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  empty: {
-    alignItems: 'center',
-    paddingTop: 40,
-  },
-  emptyText: {
-    color: Colors.textSecondary,
-    fontSize: 15,
-  },
-  createButton: {
-    margin: 16,
-    backgroundColor: Colors.primary,
-    borderRadius: 12,
-    paddingVertical: 15,
-    alignItems: 'center',
-  },
-  createButtonDisabled: {
-    opacity: 0.4,
-  },
-  createButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});
+const createStyles = (C: ReturnType<typeof import('../../hooks/useColors').useColors>) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: C.background,
+    },
+    nameSection: {
+      paddingHorizontal: 16,
+      paddingTop: 16,
+      paddingBottom: 8,
+    },
+    nameInput: {
+      borderWidth: 1.5,
+      borderColor: C.border,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 16,
+      color: C.text,
+      backgroundColor: C.backgroundSecondary,
+    },
+    chipsSection: {
+      paddingVertical: 8,
+    },
+    chips: {
+      paddingHorizontal: 16,
+      gap: 8,
+    },
+    chip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: C.primary + '20',
+      borderRadius: 20,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      gap: 6,
+    },
+    chipText: {
+      fontSize: 13,
+      color: C.primary,
+      fontWeight: '500',
+      maxWidth: 100,
+    },
+    chipRemove: {
+      fontSize: 11,
+      color: C.primary,
+    },
+    hint: {
+      fontSize: 13,
+      color: C.textSecondary,
+      paddingHorizontal: 16,
+      paddingBottom: 8,
+    },
+    searchBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginHorizontal: 16,
+      marginBottom: 4,
+      paddingHorizontal: 14,
+      backgroundColor: C.backgroundSecondary,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: C.border,
+      height: 44,
+    },
+    searchIcon: {
+      fontSize: 16,
+      marginRight: 8,
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: 15,
+      color: C.text,
+    },
+    userRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: C.border,
+      gap: 12,
+    },
+    userInfo: {
+      flex: 1,
+    },
+    userName: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: C.text,
+    },
+    userHandle: {
+      fontSize: 13,
+      color: C.textSecondary,
+      marginTop: 2,
+    },
+    checkbox: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      borderWidth: 2,
+      borderColor: C.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    checkboxSelected: {
+      backgroundColor: C.primary,
+      borderColor: C.primary,
+    },
+    checkmark: {
+      color: '#fff',
+      fontSize: 13,
+      fontWeight: '700',
+    },
+    empty: {
+      alignItems: 'center',
+      paddingTop: 40,
+    },
+    emptyText: {
+      color: C.textSecondary,
+      fontSize: 15,
+    },
+    createButton: {
+      margin: 16,
+      backgroundColor: C.primary,
+      borderRadius: 12,
+      paddingVertical: 15,
+      alignItems: 'center',
+    },
+    createButtonDisabled: {
+      opacity: 0.4,
+    },
+    createButtonText: {
+      color: '#fff',
+      fontSize: 16,
+      fontWeight: '600',
+    },
+  });

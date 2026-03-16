@@ -6,7 +6,7 @@ import MainNavigator from './MainNavigator';
 import { useAuthStore, useOnlineStore, useChatsStore, useMessagesStore } from '../store';
 import { getToken, getSavedUser } from '../utils/storage';
 import { connectSocket, disconnectSocket, getSocket } from '../socket/socketClient';
-import { Colors } from '../constants/colors';
+import { useColors } from '../hooks/useColors';
 
 interface Props {
   navigationRef?: React.RefObject<NavigationContainerRef<any>>;
@@ -15,6 +15,7 @@ interface Props {
 export default function RootNavigator({ navigationRef }: Props) {
   const { isAuthenticated, setAuth } = useAuthStore();
   const [bootstrapping, setBootstrapping] = useState(true);
+  const C = useColors();
 
   useEffect(() => {
     async function bootstrap() {
@@ -51,8 +52,7 @@ export default function RootNavigator({ navigationRef }: Props) {
     }
   }, [isAuthenticated, token]);
 
-  // Global online/offline listeners — registered right after socket is created
-  // so we catch the initial user-online events the server emits on connect
+  // Global online/offline listeners
   useEffect(() => {
     if (!isAuthenticated || !token) return;
 
@@ -73,8 +73,8 @@ export default function RootNavigator({ navigationRef }: Props) {
 
   if (bootstrapping) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={Colors.primary} size="large" />
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.background }}>
+        <ActivityIndicator color={C.primary} size="large" />
       </View>
     );
   }

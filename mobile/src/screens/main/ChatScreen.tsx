@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   FlatList,
@@ -15,7 +15,6 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useHeaderHeight } from '@react-navigation/elements';
-import { Colors } from '../../constants/colors';
 import { getMessages, sendMessage, markChatAsRead, uploadFile, reactToMessage } from '../../api/chatsApi';
 import { Message, Chat } from '../../api/chatsApi';
 import { useMessagesStore, useChatsStore, useAuthStore, useOnlineStore } from '../../store';
@@ -31,6 +30,7 @@ import {
   emitTypingStart,
   emitTypingStop,
 } from '../../socket/socketClient';
+import { useColors } from '../../hooks/useColors';
 
 interface PendingMedia {
   uri: string;
@@ -52,6 +52,8 @@ export default function ChatScreen({ navigation, route }: Props) {
   const { updateLastMessage, markChatRead, setActiveChatId, setPartnerReadAt, chats } = useChatsStore();
   const currentChat = chats.find((c) => c.id === chat.id);
   const partnerLastReadAt = currentChat?.partner_last_read_at || 0;
+  const C = useColors();
+  const styles = useMemo(() => createStyles(C), [C]);
 
   const messages = messagesByChatId[chat.id] || [];
   const [inputText, setInputText] = useState('');
@@ -95,10 +97,8 @@ export default function ChatScreen({ navigation, route }: Props) {
         </TouchableOpacity>
       ),
     });
-  }, [chatName, otherMember, partnerIsOnline, isGroup]);
+  }, [chatName, otherMember, partnerIsOnline, isGroup, styles]);
 
-  // Track this as the active chat (for unread logic + push suppression)
-  // Clear when app is backgrounded so push notifications still arrive
   useEffect(() => {
     setActiveChatId(chat.id);
     setActiveChat(chat.id);
@@ -107,7 +107,6 @@ export default function ChatScreen({ navigation, route }: Props) {
       if (state === 'active') {
         setActiveChat(chat.id);
       } else {
-        // backgrounded or inactive — allow push delivery
         setActiveChat(null);
       }
     });
@@ -119,7 +118,6 @@ export default function ChatScreen({ navigation, route }: Props) {
     };
   }, [chat.id]);
 
-  // Load initial messages and mark as read
   useEffect(() => {
     (async () => {
       try {
@@ -135,7 +133,6 @@ export default function ChatScreen({ navigation, route }: Props) {
     })();
   }, [chat.id]);
 
-  // Socket listeners
   useEffect(() => {
     joinChat(chat.id);
     const socket = getSocket();
@@ -146,7 +143,6 @@ export default function ChatScreen({ navigation, route }: Props) {
         addMessage(chat.id, msg);
         updateLastMessage(chat.id, msg);
         scrollToEnd();
-        // Auto-mark as read since chat is open
         markChatAsRead(chat.id).catch(() => {});
         markChatRead(chat.id);
       }
@@ -217,7 +213,6 @@ export default function ChatScreen({ navigation, route }: Props) {
   async function handleSend() {
     if (sending) return;
 
-    // If there's pending media, send that
     if (pendingMedia) {
       setSending(true);
       try {
@@ -241,7 +236,6 @@ export default function ChatScreen({ navigation, route }: Props) {
       return;
     }
 
-    // Otherwise send text
     const text = inputText.trim();
     if (!text) return;
 
@@ -301,7 +295,7 @@ export default function ChatScreen({ navigation, route }: Props) {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color={Colors.primary} size="large" />
+        <ActivityIndicator color={C.primary} size="large" />
       </View>
     );
   }
@@ -340,7 +334,6 @@ export default function ChatScreen({ navigation, route }: Props) {
         onLayout={scrollToEnd}
       />
 
-      {/* Media preview strip */}
       {pendingMedia && (
         <View style={styles.mediaPreview}>
           <View style={styles.mediaPreviewThumb}>
@@ -360,7 +353,7 @@ export default function ChatScreen({ navigation, route }: Props) {
             onPress={() => setPendingMedia(null)}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Ionicons name="close-circle" size={22} color={Colors.textSecondary} />
+            <Ionicons name="close-circle" size={22} color={C.textSecondary} />
           </TouchableOpacity>
         </View>
       )}
@@ -372,14 +365,14 @@ export default function ChatScreen({ navigation, route }: Props) {
           disabled={sending}
           activeOpacity={0.7}
         >
-          <Ionicons name="attach" size={24} color={Colors.textSecondary} />
+          <Ionicons name="attach" size={24} color={C.textSecondary} />
         </TouchableOpacity>
         <TextInput
           style={styles.input}
           value={inputText}
           onChangeText={handleTextChange}
           placeholder={pendingMedia ? 'Подпись...' : 'Сообщение...'}
-          placeholderTextColor={Colors.textLight}
+          placeholderTextColor={C.textLight}
           multiline
           maxLength={4000}
           returnKeyType="default"
@@ -401,129 +394,131 @@ export default function ChatScreen({ navigation, route }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.backgroundSecondary,
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  headerInfo: {},
-  headerName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.text,
-  },
-  headerStatus: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-  },
-  headerStatusOnline: {
-    color: Colors.primary,
-  },
-  messagesList: {
-    paddingVertical: 12,
-    flexGrow: 1,
-  },
-  emptyMessages: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 60,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-  },
-  mediaPreview: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.background,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: Colors.border,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 10,
-  },
-  mediaPreviewThumb: {
-    width: 52,
-    height: 52,
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  imageThumb: {
-    width: 52,
-    height: 52,
-    borderRadius: 8,
-  },
-  videoThumb: {
-    width: 52,
-    height: 52,
-    borderRadius: 8,
-    backgroundColor: '#333',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mediaPreviewName: {
-    flex: 1,
-    fontSize: 14,
-    color: Colors.text,
-    fontWeight: '500',
-  },
-  mediaCancelBtn: {
-    padding: 4,
-  },
-  inputBar: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    backgroundColor: Colors.background,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: Colors.border,
-    gap: 6,
-  },
-  attachButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  input: {
-    flex: 1,
-    minHeight: 40,
-    maxHeight: 120,
-    borderRadius: 20,
-    backgroundColor: Colors.backgroundSecondary,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: Colors.text,
-  },
-  sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sendButtonDisabled: {
-    opacity: 0.4,
-  },
-  sendIcon: {
-    color: '#fff',
-    fontSize: 14,
-    marginLeft: 2,
-  },
-});
+const createStyles = (C: ReturnType<typeof import('../../hooks/useColors').useColors>) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: C.backgroundSecondary,
+    },
+    centered: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: C.backgroundSecondary,
+    },
+    headerTitle: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    headerInfo: {},
+    headerName: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: C.text,
+    },
+    headerStatus: {
+      fontSize: 12,
+      color: C.textSecondary,
+    },
+    headerStatusOnline: {
+      color: C.primary,
+    },
+    messagesList: {
+      paddingVertical: 12,
+      flexGrow: 1,
+    },
+    emptyMessages: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingTop: 60,
+    },
+    emptyText: {
+      fontSize: 14,
+      color: C.textSecondary,
+    },
+    mediaPreview: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: C.background,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: C.border,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      gap: 10,
+    },
+    mediaPreviewThumb: {
+      width: 52,
+      height: 52,
+      borderRadius: 8,
+      overflow: 'hidden',
+    },
+    imageThumb: {
+      width: 52,
+      height: 52,
+      borderRadius: 8,
+    },
+    videoThumb: {
+      width: 52,
+      height: 52,
+      borderRadius: 8,
+      backgroundColor: '#333',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    mediaPreviewName: {
+      flex: 1,
+      fontSize: 14,
+      color: C.text,
+      fontWeight: '500',
+    },
+    mediaCancelBtn: {
+      padding: 4,
+    },
+    inputBar: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      paddingHorizontal: 8,
+      paddingVertical: 8,
+      backgroundColor: C.background,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: C.border,
+      gap: 6,
+    },
+    attachButton: {
+      width: 40,
+      height: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    input: {
+      flex: 1,
+      minHeight: 40,
+      maxHeight: 120,
+      borderRadius: 20,
+      backgroundColor: C.backgroundSecondary,
+      borderWidth: 1,
+      borderColor: C.border,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      fontSize: 15,
+      color: C.text,
+    },
+    sendButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: C.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    sendButtonDisabled: {
+      opacity: 0.4,
+    },
+    sendIcon: {
+      color: '#fff',
+      fontSize: 14,
+      marginLeft: 2,
+    },
+  });

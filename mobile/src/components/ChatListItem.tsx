@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
-import { Colors } from '../constants/colors';
 import Avatar from './Avatar';
 import { Chat } from '../api/chatsApi';
 import { formatChatTime } from '../utils/formatTime';
 import { useOnlineStore } from '../store';
+import { useColors } from '../hooks/useColors';
 
 interface ChatListItemProps {
   chat: Chat;
@@ -16,6 +16,9 @@ export default function ChatListItem({ chat, currentUserId, onPress }: ChatListI
   const isGroup = chat.type === 'group';
   const otherMember = isGroup ? null : chat.members.find((m) => m.id !== currentUserId);
   const isOnline = useOnlineStore((s) => otherMember ? s.onlineUserIds.has(otherMember.id) : false);
+  const C = useColors();
+  const styles = useMemo(() => createStyles(C), [C]);
+
   const name = isGroup
     ? (chat.name || 'Группа')
     : (otherMember?.display_name || otherMember?.username || 'Пользователь');
@@ -60,72 +63,73 @@ export default function ChatListItem({ chat, currentUserId, onPress }: ChatListI
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: Colors.background,
-  },
-  content: {
-    flex: 1,
-    marginLeft: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-    paddingBottom: 10,
-  },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  name: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.text,
-    flex: 1,
-    marginRight: 8,
-  },
-  metaRight: {
-    alignItems: 'flex-end',
-  },
-  time: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-  },
-  timeUnread: {
-    color: Colors.primary,
-    fontWeight: '600',
-  },
-  lastMessage: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    marginTop: 2,
-    flex: 1,
-    marginRight: 8,
-  },
-  lastMessageUnread: {
-    color: Colors.text,
-    fontWeight: '500',
-  },
-  youPrefix: {
-    color: Colors.primary,
-  },
-  badge: {
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 5,
-    marginTop: 2,
-  },
-  badgeText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-    lineHeight: 14,
-  },
-});
+const createStyles = (C: ReturnType<typeof import('../hooks/useColors').useColors>) =>
+  StyleSheet.create({
+    container: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      backgroundColor: C.background,
+    },
+    content: {
+      flex: 1,
+      marginLeft: 12,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: C.border,
+      paddingBottom: 10,
+    },
+    row: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    name: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: C.text,
+      flex: 1,
+      marginRight: 8,
+    },
+    metaRight: {
+      alignItems: 'flex-end',
+    },
+    time: {
+      fontSize: 13,
+      color: C.textSecondary,
+    },
+    timeUnread: {
+      color: C.primary,
+      fontWeight: '600',
+    },
+    lastMessage: {
+      fontSize: 14,
+      color: C.textSecondary,
+      marginTop: 2,
+      flex: 1,
+      marginRight: 8,
+    },
+    lastMessageUnread: {
+      color: C.text,
+      fontWeight: '500',
+    },
+    youPrefix: {
+      color: C.primary,
+    },
+    badge: {
+      minWidth: 20,
+      height: 20,
+      borderRadius: 10,
+      backgroundColor: C.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 5,
+      marginTop: 2,
+    },
+    badgeText: {
+      color: '#fff',
+      fontSize: 12,
+      fontWeight: '600',
+      lineHeight: 14,
+    },
+  });

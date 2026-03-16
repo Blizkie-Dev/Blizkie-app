@@ -1,22 +1,23 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import PhoneEmailScreen from '../screens/auth/PhoneEmailScreen';
 import VerifyCodeScreen from '../screens/auth/VerifyCodeScreen';
 import SetupProfileScreen from '../screens/auth/SetupProfileScreen';
-import { Colors } from '../constants/colors';
+import { useColors } from '../hooks/useColors';
 
 const Stack = createStackNavigator();
 
 export default function AuthNavigator() {
+  const C = useColors();
+  const screenOptions = useMemo(() => ({
+    headerStyle: { backgroundColor: C.background, shadowColor: 'transparent' },
+    headerTintColor: C.primary,
+    headerBackTitleVisible: false,
+    cardStyle: { backgroundColor: C.background },
+  }), [C]);
+
   return (
-    <Stack.Navigator
-      screenOptions={{
-        headerStyle: { backgroundColor: Colors.background, shadowColor: 'transparent' },
-        headerTintColor: Colors.primary,
-        headerBackTitleVisible: false,
-        cardStyle: { backgroundColor: Colors.background },
-      }}
-    >
+    <Stack.Navigator screenOptions={screenOptions}>
       <Stack.Screen
         name="PhoneEmail"
         component={PhoneEmailScreen}

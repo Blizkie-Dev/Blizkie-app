@@ -5,7 +5,7 @@ import * as Notifications from 'expo-notifications';
 import { NavigationContainerRef } from '@react-navigation/native';
 import RootNavigator from './src/navigation/RootNavigator';
 import { setupNotifications } from './src/utils/notifications';
-import { useAuthStore } from './src/store';
+import { useAuthStore, useThemeStore } from './src/store';
 import { getChatById } from './src/api/chatsApi';
 
 async function navigateToChat(
@@ -28,6 +28,12 @@ export default function App() {
   const token = useAuthStore((s) => s.token);
   const listenerRef = useRef<Notifications.Subscription | null>(null);
   const navigationRef = useRef<NavigationContainerRef<any>>(null);
+  const isDark = useThemeStore((s) => s.isDark);
+  const initTheme = useThemeStore((s) => s.initTheme);
+
+  useEffect(() => {
+    initTheme();
+  }, []);
 
   useEffect(() => {
     if (!token) return;
@@ -55,7 +61,7 @@ export default function App() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <StatusBar style="auto" />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <RootNavigator navigationRef={navigationRef} />
     </GestureHandlerRootView>
   );

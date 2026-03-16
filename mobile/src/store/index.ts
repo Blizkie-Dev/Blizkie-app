@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import * as SecureStore from 'expo-secure-store';
 import { User } from '../api/authApi';
 import { Chat, Message } from '../api/chatsApi';
 
@@ -117,6 +118,31 @@ interface MessagesState {
   updateMessageReaction: (chatId: string, messageId: string, liked_by: string[]) => void;
   clearMessages: () => void;
 }
+
+// ─── Theme Slice ───────────────────────────────────────────────────────────
+
+interface ThemeState {
+  isDark: boolean;
+  toggleTheme: () => void;
+  initTheme: () => Promise<void>;
+}
+
+export const useThemeStore = create<ThemeState>((set, get) => ({
+  isDark: false,
+  toggleTheme: () => {
+    const next = !get().isDark;
+    set({ isDark: next });
+    SecureStore.setItemAsync('app_theme', next ? 'dark' : 'light').catch(() => {});
+  },
+  initTheme: async () => {
+    try {
+      const saved = await SecureStore.getItemAsync('app_theme');
+      if (saved === 'dark') set({ isDark: true });
+    } catch {}
+  },
+}));
+
+// ─── Messages Slice ────────────────────────────────────────────────────────
 
 export const useMessagesStore = create<MessagesState>((set) => ({
   messagesByChatId: {},

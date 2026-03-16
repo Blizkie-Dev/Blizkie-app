@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   TextInput,
@@ -9,13 +9,13 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { Colors } from '../../constants/colors';
 import { searchUsers } from '../../api/usersApi';
 import { createOrGetChat } from '../../api/chatsApi';
 import { User } from '../../api/authApi';
 import { useChatsStore } from '../../store';
 import Avatar from '../../components/Avatar';
 import { joinChat } from '../../socket/socketClient';
+import { useColors } from '../../hooks/useColors';
 
 interface Props {
   navigation: any;
@@ -28,6 +28,8 @@ export default function SearchUsersScreen({ navigation }: Props) {
   const [opening, setOpening] = useState<string | null>(null);
   const { upsertChat } = useChatsStore();
   const searchTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const C = useColors();
+  const styles = useMemo(() => createStyles(C), [C]);
 
   function handleSearch(text: string) {
     setQuery(text);
@@ -72,7 +74,7 @@ export default function SearchUsersScreen({ navigation }: Props) {
           value={query}
           onChangeText={handleSearch}
           placeholder="Поиск по имени или username"
-          placeholderTextColor={Colors.textLight}
+          placeholderTextColor={C.textLight}
           autoFocus
           autoCapitalize="none"
           autoCorrect={false}
@@ -81,10 +83,7 @@ export default function SearchUsersScreen({ navigation }: Props) {
       </View>
 
       {loading && (
-        <ActivityIndicator
-          color={Colors.primary}
-          style={{ marginTop: 24 }}
-        />
+        <ActivityIndicator color={C.primary} style={{ marginTop: 24 }} />
       )}
 
       <FlatList
@@ -107,7 +106,7 @@ export default function SearchUsersScreen({ navigation }: Props) {
                 )}
               </View>
               {opening === item.id && (
-                <ActivityIndicator color={Colors.primary} size="small" />
+                <ActivityIndicator color={C.primary} size="small" />
               )}
             </TouchableOpacity>
           );
@@ -124,59 +123,60 @@ export default function SearchUsersScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    margin: 12,
-    paddingHorizontal: 14,
-    backgroundColor: Colors.backgroundSecondary,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    height: 44,
-  },
-  searchIcon: {
-    fontSize: 16,
-    marginRight: 8,
-  },
-  input: {
-    flex: 1,
-    fontSize: 15,
-    color: Colors.text,
-  },
-  userRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-    gap: 12,
-  },
-  userInfo: {
-    flex: 1,
-  },
-  userName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: Colors.text,
-  },
-  userHandle: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
-  empty: {
-    alignItems: 'center',
-    paddingTop: 60,
-  },
-  emptyText: {
-    color: Colors.textSecondary,
-    fontSize: 15,
-  },
-});
+const createStyles = (C: ReturnType<typeof import('../../hooks/useColors').useColors>) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: C.background,
+    },
+    searchBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      margin: 12,
+      paddingHorizontal: 14,
+      backgroundColor: C.backgroundSecondary,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: C.border,
+      height: 44,
+    },
+    searchIcon: {
+      fontSize: 16,
+      marginRight: 8,
+    },
+    input: {
+      flex: 1,
+      fontSize: 15,
+      color: C.text,
+    },
+    userRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: C.border,
+      gap: 12,
+    },
+    userInfo: {
+      flex: 1,
+    },
+    userName: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: C.text,
+    },
+    userHandle: {
+      fontSize: 13,
+      color: C.textSecondary,
+      marginTop: 2,
+    },
+    empty: {
+      alignItems: 'center',
+      paddingTop: 60,
+    },
+    emptyText: {
+      color: C.textSecondary,
+      fontSize: 15,
+    },
+  });

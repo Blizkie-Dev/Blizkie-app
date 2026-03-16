@@ -3,10 +3,10 @@ import { ActivityIndicator, View } from 'react-native';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import AuthNavigator from './AuthNavigator';
 import MainNavigator from './MainNavigator';
-import { useAuthStore, useOnlineStore } from '../store';
+import { useAuthStore, useOnlineStore, useChatsStore, useMessagesStore } from '../store';
 import { getToken, getSavedUser } from '../utils/storage';
-import { connectSocket, getSocket } from '../socket/socketClient';
-import { Colors } from '../constants/colors';
+import { connectSocket, disconnectSocket, getSocket } from '../socket/socketClient';
+import { useColors } from '../hooks/useColors';
 
 interface Props {
   navigationRef?: React.RefObject<NavigationContainerRef<any>>;
@@ -15,6 +15,7 @@ interface Props {
 export default function RootNavigator({ navigationRef }: Props) {
   const { isAuthenticated, setAuth } = useAuthStore();
   const [bootstrapping, setBootstrapping] = useState(true);
+  const C = useColors();
 
   useEffect(() => {
     async function bootstrap() {
@@ -36,16 +37,22 @@ export default function RootNavigator({ navigationRef }: Props) {
 
   // Connect socket when auth state changes to authenticated
   const token = useAuthStore((s) => s.token);
-  const { setUserOnline, setUserOffline } = useOnlineStore();
+  const { setUserOnline, setUserOffline, clearOnline } = useOnlineStore();
+  const { clearChats } = useChatsStore();
+  const { clearMessages } = useMessagesStore();
 
   useEffect(() => {
     if (isAuthenticated && token) {
       connectSocket(token);
+    } else if (!isAuthenticated) {
+      disconnectSocket();
+      clearOnline();
+      clearChats();
+      clearMessages();
     }
   }, [isAuthenticated, token]);
 
-  // Global online/offline listeners — registered right after socket is created
-  // so we catch the initial user-online events the server emits on connect
+  // Global online/offline listeners
   useEffect(() => {
     if (!isAuthenticated || !token) return;
 
@@ -66,8 +73,8 @@ export default function RootNavigator({ navigationRef }: Props) {
 
   if (bootstrapping) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={Colors.primary} size="large" />
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.background }}>
+        <ActivityIndicator color={C.primary} size="large" />
       </View>
     );
   }

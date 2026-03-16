@@ -1,29 +1,31 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Text } from 'react-native';
-import { Colors } from '../constants/colors';
 import ChatsListScreen from '../screens/main/ChatsListScreen';
 import ChatScreen from '../screens/main/ChatScreen';
 import SearchUsersScreen from '../screens/main/SearchUsersScreen';
+import CreateGroupScreen from '../screens/main/CreateGroupScreen';
 import ProfileScreen from '../screens/main/ProfileScreen';
+import { useColors } from '../hooks/useColors';
 
 const Tab = createBottomTabNavigator();
 const ChatsStack = createStackNavigator();
 
 function ChatsStackNavigator() {
+  const C = useColors();
+  const screenOptions = useMemo(() => ({
+    headerStyle: {
+      backgroundColor: C.background,
+      shadowColor: '#00000015',
+    },
+    headerTintColor: C.primary,
+    headerBackTitleVisible: false,
+    cardStyle: { backgroundColor: C.backgroundSecondary },
+  }), [C]);
+
   return (
-    <ChatsStack.Navigator
-      screenOptions={{
-        headerStyle: {
-          backgroundColor: Colors.background,
-          shadowColor: '#00000015',
-        },
-        headerTintColor: Colors.primary,
-        headerBackTitleVisible: false,
-        cardStyle: { backgroundColor: Colors.backgroundSecondary },
-      }}
-    >
+    <ChatsStack.Navigator screenOptions={screenOptions}>
       <ChatsStack.Screen
         name="ChatsList"
         component={ChatsListScreen}
@@ -32,28 +34,36 @@ function ChatsStackNavigator() {
       <ChatsStack.Screen
         name="Chat"
         component={ChatScreen as any}
-        options={{ title: '' }}
+        options={{ title: '', gestureEnabled: true }}
       />
       <ChatsStack.Screen
         name="SearchUsers"
         component={SearchUsersScreen}
         options={{ title: 'Новый чат' }}
       />
+      <ChatsStack.Screen
+        name="CreateGroup"
+        component={CreateGroupScreen}
+        options={{ title: 'Новая группа' }}
+      />
     </ChatsStack.Navigator>
   );
 }
 
 export default function MainNavigator() {
+  const C = useColors();
+  const tabBarStyle = useMemo(() => ({
+    backgroundColor: C.background,
+    borderTopColor: C.border,
+  }), [C]);
+
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle: {
-          backgroundColor: Colors.background,
-          borderTopColor: Colors.border,
-        },
-        tabBarActiveTintColor: Colors.primary,
-        tabBarInactiveTintColor: Colors.textSecondary,
+        tabBarStyle,
+        tabBarActiveTintColor: C.primary,
+        tabBarInactiveTintColor: C.textSecondary,
       }}
     >
       <Tab.Screen
@@ -73,8 +83,8 @@ export default function MainNavigator() {
           tabBarLabel: 'Профиль',
           headerShown: true,
           title: 'Мой профиль',
-          headerStyle: { backgroundColor: Colors.background },
-          headerTintColor: Colors.text,
+          headerStyle: { backgroundColor: C.background },
+          headerTintColor: C.text,
           tabBarIcon: ({ color, size }) => (
             <Text style={{ fontSize: size - 2, color }}>👤</Text>
           ),

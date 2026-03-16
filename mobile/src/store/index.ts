@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import * as SecureStore from 'expo-secure-store';
 import { User } from '../api/authApi';
 import { Chat, Message } from '../api/chatsApi';
 
@@ -34,6 +35,7 @@ interface ChatsState {
   incrementUnread: (chatId: string) => void;
   setActiveChatId: (chatId: string | null) => void;
   setPartnerReadAt: (chatId: string, readAt: number) => void;
+  clearChats: () => void;
 }
 
 export const useChatsStore = create<ChatsState>((set) => ({
@@ -75,6 +77,7 @@ export const useChatsStore = create<ChatsState>((set) => ({
         c.id === chatId ? { ...c, partner_last_read_at: readAt } : c
       ),
     })),
+  clearChats: () => set({ chats: [], activeChatId: null }),
 }));
 
 // ─── Online Users Slice ────────────────────────────────────────────────────
@@ -83,6 +86,7 @@ interface OnlineState {
   onlineUserIds: Set<string>;
   setUserOnline: (userId: string) => void;
   setUserOffline: (userId: string) => void;
+  clearOnline: () => void;
   isOnline: (userId: string) => boolean;
 }
 
@@ -100,6 +104,7 @@ export const useOnlineStore = create<OnlineState>((set, get) => ({
       next.delete(userId);
       return { onlineUserIds: next };
     }),
+  clearOnline: () => set({ onlineUserIds: new Set() }),
   isOnline: (userId) => get().onlineUserIds.has(userId),
 }));
 
@@ -111,7 +116,33 @@ interface MessagesState {
   addMessage: (chatId: string, message: Message) => void;
   prependMessages: (chatId: string, messages: Message[]) => void;
   updateMessageReaction: (chatId: string, messageId: string, liked_by: string[]) => void;
+  clearMessages: () => void;
 }
+
+// ─── Theme Slice ───────────────────────────────────────────────────────────
+
+interface ThemeState {
+  isDark: boolean;
+  toggleTheme: () => void;
+  initTheme: () => Promise<void>;
+}
+
+export const useThemeStore = create<ThemeState>((set, get) => ({
+  isDark: false,
+  toggleTheme: () => {
+    const next = !get().isDark;
+    set({ isDark: next });
+    SecureStore.setItemAsync('app_theme', next ? 'dark' : 'light').catch(() => {});
+  },
+  initTheme: async () => {
+    try {
+      const saved = await SecureStore.getItemAsync('app_theme');
+      if (saved === 'dark') set({ isDark: true });
+    } catch {}
+  },
+}));
+
+// ─── Messages Slice ────────────────────────────────────────────────────────
 
 export const useMessagesStore = create<MessagesState>((set) => ({
   messagesByChatId: {},
@@ -152,4 +183,5 @@ export const useMessagesStore = create<MessagesState>((set) => ({
         },
       };
     }),
+  clearMessages: () => set({ messagesByChatId: {} }),
 }));

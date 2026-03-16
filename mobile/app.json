@@ -43,7 +43,8 @@
           "color": "#2AABEE",
           "defaultChannel": "messages"
         }
-      ]
+      ],
+      "expo-asset"
     ],
     "extra": {
       "eas": {

@@ -17,8 +17,11 @@ router.put('/push-token', (req, res) => {
     return res.status(400).json({ error: 'push_token required' });
   }
   const { getDb } = require('../config/database');
-  getDb()
-    .prepare('UPDATE users SET push_token = ? WHERE id = ?')
+  const db = getDb();
+  // Remove this token from any other user first (device was used by different account)
+  db.prepare('UPDATE users SET push_token = NULL WHERE push_token = ? AND id != ?')
+    .run([push_token, req.userId]);
+  db.prepare('UPDATE users SET push_token = ? WHERE id = ?')
     .run([push_token, req.userId]);
   res.json({ ok: true });
 });

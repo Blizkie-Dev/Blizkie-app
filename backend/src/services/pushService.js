@@ -2,24 +2,28 @@ const { Expo } = require('expo-server-sdk');
 
 const expo = new Expo();
 
-async function sendMessagePush(pushToken, senderName, messageText, data = {}) {
+async function sendMessagePush(pushToken, { title, body: rawBody, imageUrl }, data = {}) {
   if (!pushToken || !Expo.isExpoPushToken(pushToken)) return;
 
   const body =
-    messageText.length > 100
-      ? messageText.substring(0, 97) + '...'
-      : messageText;
+    rawBody.length > 100
+      ? rawBody.substring(0, 97) + '...'
+      : rawBody;
+
+  const message = {
+    to: pushToken,
+    sound: 'default',
+    title: title || 'Новое сообщение',
+    body,
+    data,
+  };
+
+  if (imageUrl) {
+    message.image = imageUrl;
+  }
 
   try {
-    const chunks = expo.chunkPushNotifications([
-      {
-        to: pushToken,
-        sound: 'default',
-        title: senderName || 'Новое сообщение',
-        body,
-        data,
-      },
-    ]);
+    const chunks = expo.chunkPushNotifications([message]);
     for (const chunk of chunks) {
       await expo.sendPushNotificationsAsync(chunk);
     }

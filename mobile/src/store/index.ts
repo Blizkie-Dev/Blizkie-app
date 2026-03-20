@@ -116,6 +116,7 @@ interface MessagesState {
   addMessage: (chatId: string, message: Message) => void;
   prependMessages: (chatId: string, messages: Message[]) => void;
   updateMessageReaction: (chatId: string, messageId: string, liked_by: string[]) => void;
+  removeMessage: (chatId: string, messageId: string) => void;
   clearMessages: () => void;
 }
 
@@ -180,6 +181,16 @@ export const useMessagesStore = create<MessagesState>((set) => ({
         messagesByChatId: {
           ...state.messagesByChatId,
           [chatId]: msgs.map((m) => (m.id === messageId ? { ...m, liked_by } : m)),
+        },
+      };
+    }),
+  removeMessage: (chatId, messageId) =>
+    set((state) => {
+      const msgs = state.messagesByChatId[chatId] || [];
+      return {
+        messagesByChatId: {
+          ...state.messagesByChatId,
+          [chatId]: msgs.filter((m) => m.id !== messageId),
         },
       };
     }),

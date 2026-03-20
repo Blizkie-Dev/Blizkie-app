@@ -11,12 +11,14 @@ import {
   Alert,
   Image,
   AppState,
+  PanResponder,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
+import { Audio } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import { useHeaderHeight } from '@react-navigation/elements';
-import { getMessages, sendMessage, markChatAsRead, uploadFile, reactToMessage } from '../../api/chatsApi';
+import { getMessages, sendMessage, markChatAsRead, uploadFile, reactToMessage, deleteMessage } from '../../api/chatsApi';
 import { Message, Chat } from '../../api/chatsApi';
 import { useMessagesStore, useChatsStore, useAuthStore, useOnlineStore } from '../../store';
 import MessageBubble from '../../components/MessageBubble';
@@ -40,16 +42,26 @@ interface PendingMedia {
   isVideo: boolean;
 }
 
+interface PendingVoice {
+  uri: string;
+  mimeType: string;
+  filename: string;
+  durationSec: number;
+  waveform: number[];
+}
+
 interface Props {
   navigation: any;
   route: { params: { chat: Chat } };
 }
 
+const MAX_VOICE_SECONDS = 60;
+
 export default function ChatScreen({ navigation, route }: Props) {
   const { chat } = route.params;
   const headerHeight = useHeaderHeight();
   const user = useAuthStore((s) => s.user)!;
-  const { messagesByChatId, setMessages, addMessage, prependMessages, updateMessageReaction } = useMessagesStore();
+  const { messagesByChatId, setMessages, addMessage, prependMessages, updateMessageReaction, removeMessage } = useMessagesStore();
   const { updateLastMessage, markChatRead, setActiveChatId, setPartnerReadAt, chats } = useChatsStore();
   const currentChat = chats.find((c) => c.id === chat.id);
   const partnerLastReadAt = currentChat?.partner_last_read_at || 0;
@@ -64,12 +76,19 @@ export default function ChatScreen({ navigation, route }: Props) {
   const [sending, setSending] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [pendingMedia, setPendingMedia] = useState<PendingMedia | null>(null);
+  const [pendingVoice, setPendingVoice] = useState<PendingVoice | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [recordingLevel, setRecordingLevel] = useState(0);
+  const [waveform, setWaveform] = useState<number[]>([]);
   const flatListRef = useRef<FlatList>(null);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTyping = useRef(false);
   const isAtBottom = useRef(true);
   const shouldScrollToEnd = useRef(true);
   const lastMessageIdRef = useRef<string | null>(null);
+  const recordingRef = useRef<Audio.Recording | null>(null);
+  const recordingDurationMsRef = useRef(0);
 
   const isGroup = chat.type === 'group';
   const otherMember = isGroup ? null : chat.members.find((m) => m.id !== user.id);
@@ -123,6 +142,15 @@ export default function ChatScreen({ navigation, route }: Props) {
       sub.remove();
     };
   }, [chat.id]);
+
+  useEffect(() => {
+    return () => {
+      if (recordingRef.current) {
+        recordingRef.current.stopAndUnloadAsync().catch(() => {});
+      }
+      Audio.setAudioModeAsync({ allowsRecordingIOS: false }).catch(() => {});
+    };
+  }, []);
 
   useEffect(() => {
     // Reset scroll state when switching chats
@@ -196,11 +224,22 @@ export default function ChatScreen({ navigation, route }: Props) {
       }
     };
 
+    const onMessageDeleted = ({ chatId: cId, messageId }: { chatId: string; messageId: string }) => {
+      if (cId !== chat.id) return;
+      removeMessage(chat.id, messageId);
+      const next = useMessagesStore.getState().messagesByChatId[chat.id] || [];
+      const last = next[next.length - 1] || null;
+      if (last) {
+        updateLastMessage(chat.id, last);
+      }
+    };
+
     socket.on('new-message', onNewMessage);
     socket.on('user-typing', onTyping);
     socket.on('user-stopped-typing', onStopTyping);
     socket.on('chat-read', onChatRead);
     socket.on('message-reaction', onReaction);
+    socket.on('message-deleted', onMessageDeleted);
 
     return () => {
       socket.off('new-message', onNewMessage);
@@ -208,6 +247,7 @@ export default function ChatScreen({ navigation, route }: Props) {
       socket.off('user-stopped-typing', onStopTyping);
       socket.off('chat-read', onChatRead);
       socket.off('message-reaction', onReaction);
+      socket.off('message-deleted', onMessageDeleted);
     };
   }, [chat.id]);
 
@@ -297,6 +337,30 @@ export default function ChatScreen({ navigation, route }: Props) {
       return;
     }
 
+    if (pendingVoice) {
+      setSending(true);
+      try {
+        const uploaded = await uploadFile(
+          pendingVoice.uri,
+          pendingVoice.filename,
+          pendingVoice.mimeType
+        );
+        uploaded.type = 'audio';
+        const msg = await sendMessage(chat.id, inputText.trim(), uploaded);
+        addMessage(chat.id, msg);
+        updateLastMessage(chat.id, msg);
+        setPendingVoice(null);
+        setInputText('');
+        scrollToEnd();
+      } catch (err) {
+        console.error('Failed to send voice message', err);
+        Alert.alert('Ошибка', 'Не удалось отправить голосовое сообщение');
+      } finally {
+        setSending(false);
+      }
+      return;
+    }
+
     const text = inputText.trim();
     if (!text) return;
 
@@ -351,7 +415,165 @@ export default function ChatScreen({ navigation, route }: Props) {
     }
   }
 
-  const canSend = !sending && (!!inputText.trim() || !!pendingMedia);
+  function handleMessageLongPress(message: Message) {
+    if (message.sender_id !== user.id) return;
+    Alert.alert(
+      'Удалить сообщение?',
+      'Сообщение будет удалено у всех участников чата.',
+      [
+        { text: 'Отмена', style: 'cancel' },
+        {
+          text: 'Удалить',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteMessage(chat.id, message.id);
+              removeMessage(chat.id, message.id);
+              const next = useMessagesStore.getState().messagesByChatId[chat.id] || [];
+              const last = next[next.length - 1] || null;
+              if (last) {
+                updateLastMessage(chat.id, last);
+              }
+            } catch (err: any) {
+              Alert.alert('Ошибка', err?.response?.data?.error || 'Не удалось удалить сообщение');
+            }
+          },
+        },
+      ]
+    );
+  }
+
+  function formatTimer(totalSeconds: number) {
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  }
+
+  async function clearVoiceDraft() {
+    const rec = recordingRef.current;
+    if (rec) {
+      try {
+        await rec.stopAndUnloadAsync();
+      } catch {}
+    }
+    recordingRef.current = null;
+    setIsRecording(false);
+    setRecordingSeconds(0);
+    setRecordingLevel(0);
+    setWaveform(Array(24).fill(0.08));
+    recordingDurationMsRef.current = 0;
+    setPendingVoice(null);
+    Audio.setAudioModeAsync({ allowsRecordingIOS: false }).catch(() => {});
+  }
+
+  async function startVoiceRecording() {
+    if (isRecording || sending || pendingMedia) return;
+    try {
+      const { status } = await Audio.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Нет доступа', 'Разрешите доступ к микрофону в настройках');
+        return;
+      }
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const rec = new Audio.Recording();
+      await rec.prepareToRecordAsync({
+        ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
+        isMeteringEnabled: true,
+      } as any);
+
+      setWaveform(Array(24).fill(0.08));
+      setRecordingSeconds(0);
+      setRecordingLevel(0);
+      recordingDurationMsRef.current = 0;
+
+      rec.setProgressUpdateInterval(120);
+      rec.setOnRecordingStatusUpdate((status: any) => {
+        if (!status?.isRecording) return;
+        recordingDurationMsRef.current = status.durationMillis || 0;
+        const nextSeconds = Math.floor((status.durationMillis || 0) / 1000);
+        setRecordingSeconds(nextSeconds);
+
+        const meter = typeof status.metering === 'number' ? status.metering : -160;
+        const normalized = Math.max(0.08, Math.min(1, (meter + 60) / 60));
+        setRecordingLevel(normalized);
+        setWaveform((prev) => [...prev.slice(-23), normalized]);
+
+        if (nextSeconds >= MAX_VOICE_SECONDS) {
+          stopVoiceRecordingAndKeep();
+        }
+      });
+
+      await rec.startAsync();
+      recordingRef.current = rec;
+      setIsRecording(true);
+    } catch (err) {
+      console.error('Voice record start failed', err);
+      Alert.alert('Ошибка', 'Не удалось начать запись');
+      setIsRecording(false);
+    }
+  }
+
+  async function stopVoiceRecordingAndKeep() {
+    const rec = recordingRef.current;
+    if (!rec) return;
+
+    try {
+      await rec.stopAndUnloadAsync();
+      const uri = rec.getURI();
+      const status = await rec.getStatusAsync();
+      const rawDurationMs = Math.max(
+        recordingDurationMsRef.current,
+        (status as any)?.durationMillis || 0
+      );
+      const durationSec = Math.max(
+        1,
+        Math.min(MAX_VOICE_SECONDS, Math.ceil(rawDurationMs / 1000))
+      );
+
+      if (uri) {
+        setPendingVoice({
+          uri,
+          mimeType: 'audio/m4a',
+          filename: `voice-${Date.now()}.m4a`,
+          durationSec,
+          waveform,
+        });
+      }
+    } catch (err) {
+      console.error('Voice record stop failed', err);
+    } finally {
+      recordingRef.current = null;
+      setIsRecording(false);
+      setRecordingSeconds(0);
+      setRecordingLevel(0);
+      recordingDurationMsRef.current = 0;
+      Audio.setAudioModeAsync({ allowsRecordingIOS: false }).catch(() => {});
+    }
+  }
+
+  async function cancelVoiceRecording() {
+    await clearVoiceDraft();
+  }
+
+  const recordingPan = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 12,
+        onPanResponderMove: (_, g) => {
+          if (g.dx < -90) {
+            cancelVoiceRecording();
+          }
+        },
+      }),
+    [isRecording]
+  );
+
+  const canSend = !sending && (!!inputText.trim() || !!pendingMedia || !!pendingVoice);
 
   if (loading) {
     return (
@@ -380,6 +602,7 @@ export default function ChatScreen({ navigation, route }: Props) {
             currentUserId={user.id}
             chatMembers={chat.members}
             onReact={handleReact}
+            onLongPress={handleMessageLongPress}
           />
         )}
         ListEmptyComponent={
@@ -431,37 +654,98 @@ export default function ChatScreen({ navigation, route }: Props) {
         </View>
       )}
 
+      {pendingVoice && !isRecording && (
+        <View style={styles.mediaPreview}>
+          <View style={[styles.videoThumb, styles.voicePreviewIcon]}>
+            <Ionicons name="mic" size={22} color="#fff" />
+          </View>
+          <View style={styles.voicePreviewTextWrap}>
+            <Text style={styles.mediaPreviewName}>Голосовое сообщение</Text>
+            <Text style={styles.voicePreviewMeta}>{formatTimer(pendingVoice.durationSec)}</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.mediaCancelBtn}
+            onPress={clearVoiceDraft}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="trash-outline" size={22} color={C.textSecondary} />
+          </TouchableOpacity>
+        </View>
+      )}
+
       <View style={styles.inputBar}>
-        <TouchableOpacity
-          style={styles.attachButton}
-          onPress={handleAttach}
-          disabled={sending}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="attach" size={24} color={C.textSecondary} />
-        </TouchableOpacity>
-        <TextInput
-          style={styles.input}
-          value={inputText}
-          onChangeText={handleTextChange}
-          placeholder={pendingMedia ? 'Подпись...' : 'Сообщение...'}
-          placeholderTextColor={C.textLight}
-          multiline
-          maxLength={4000}
-          returnKeyType="default"
-        />
-        <TouchableOpacity
-          style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
-          onPress={handleSend}
-          disabled={!canSend}
-          activeOpacity={0.8}
-        >
-          {sending ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <Text style={styles.sendIcon}>▶</Text>
-          )}
-        </TouchableOpacity>
+        {isRecording ? (
+          <View style={styles.recordingBar} {...recordingPan.panHandlers}>
+            <View style={styles.recordingLeft}>
+              <View style={styles.recordingDot} />
+              <Text style={styles.recordingTimer}>{formatTimer(recordingSeconds)}</Text>
+            </View>
+            <View style={styles.waveWrap}>
+              {waveform.map((v, i) => (
+                <View
+                  key={`${i}-${v}`}
+                  style={[
+                    styles.waveBar,
+                    {
+                      height: 6 + Math.round(v * 20),
+                      opacity: i === waveform.length - 1 ? 0.9 : 0.5 + v * 0.4,
+                      backgroundColor: i === waveform.length - 1 ? C.primary : C.textSecondary,
+                    },
+                  ]}
+                />
+              ))}
+            </View>
+            <View style={styles.recordingActions}>
+              <TouchableOpacity style={styles.recActionBtn} onPress={cancelVoiceRecording}>
+                <Ionicons name="trash-outline" size={20} color={C.danger} />
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.recActionBtn, styles.recSendBtn]} onPress={stopVoiceRecordingAndKeep}>
+                <Ionicons name="send" size={18} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : (
+          <>
+            <TouchableOpacity
+              style={styles.attachButton}
+              onPress={handleAttach}
+              disabled={sending}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="attach" size={24} color={C.textSecondary} />
+            </TouchableOpacity>
+            <TextInput
+              style={styles.input}
+              value={inputText}
+              onChangeText={handleTextChange}
+              placeholder={pendingMedia ? 'Подпись...' : 'Сообщение...'}
+              placeholderTextColor={C.textLight}
+              multiline
+              maxLength={4000}
+              returnKeyType="default"
+            />
+            <TouchableOpacity
+              style={[styles.micButton, (sending || pendingMedia) && styles.sendButtonDisabled]}
+              onPress={startVoiceRecording}
+              disabled={sending || !!pendingMedia}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="mic" size={18} color={C.textSecondary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
+              onPress={handleSend}
+              disabled={!canSend}
+              activeOpacity={0.8}
+            >
+              {sending ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={styles.sendIcon}>▶</Text>
+              )}
+            </TouchableOpacity>
+          </>
+        )}
       </View>
     </KeyboardAvoidingView>
   );
@@ -541,10 +825,17 @@ const createStyles = (C: ReturnType<typeof import('../../hooks/useColors').useCo
       justifyContent: 'center',
     },
     mediaPreviewName: {
-      flex: 1,
       fontSize: 14,
       color: C.text,
       fontWeight: '500',
+    },
+    voicePreviewTextWrap: {
+      flex: 1,
+    },
+    voicePreviewMeta: {
+      marginTop: 2,
+      fontSize: 14,
+      color: C.textSecondary,
     },
     mediaCancelBtn: {
       padding: 4,
@@ -562,6 +853,16 @@ const createStyles = (C: ReturnType<typeof import('../../hooks/useColors').useCo
     attachButton: {
       width: 40,
       height: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    micButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.backgroundSecondary,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -593,5 +894,69 @@ const createStyles = (C: ReturnType<typeof import('../../hooks/useColors').useCo
       color: '#fff',
       fontSize: 14,
       marginLeft: 2,
+    },
+    recordingBar: {
+      flex: 1,
+      minHeight: 44,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: C.border,
+      backgroundColor: C.backgroundSecondary,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 10,
+      gap: 8,
+    },
+    recordingLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    recordingDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: C.danger,
+    },
+    recordingTimer: {
+      fontSize: 13,
+      color: C.text,
+      fontWeight: '600',
+      width: 44,
+    },
+    waveWrap: {
+      flex: 1,
+      height: 30,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 2,
+    },
+    waveBar: {
+      width: 3,
+      borderRadius: 2,
+    },
+    recordingActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    recActionBtn: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      borderWidth: 1,
+      borderColor: C.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: C.background,
+    },
+    recSendBtn: {
+      borderColor: C.primary,
+      backgroundColor: C.primary,
+    },
+    voicePreviewIcon: {
+      backgroundColor: C.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
   });

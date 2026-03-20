@@ -1,6 +1,7 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { View, Text, Image, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Audio, AVPlaybackStatus } from 'expo-av';
 import { formatMessageTime } from '../utils/formatTime';
 import { Message } from '../api/chatsApi';
 import { User } from '../api/authApi';
@@ -20,6 +21,7 @@ interface MessageBubbleProps {
   currentUserId?: string;
   chatMembers?: User[];
   onReact?: (messageId: string) => void;
+  onLongPress?: (message: Message) => void;
 }
 
 function ReadTick({ isRead }: { isRead: boolean }) {
@@ -41,8 +43,13 @@ export default function MessageBubble({
   currentUserId,
   chatMembers,
   onReact,
+  onLongPress,
 }: MessageBubbleProps) {
   const [viewerOpen, setViewerOpen] = useState(false);
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [durationMillis, setDurationMillis] = useState(0);
+  const [positionMillis, setPositionMillis] = useState(0);
   const lastTapRef = useRef(0);
   const C = useColors();
   const styles = useMemo(() => createStyles(C), [C]);
@@ -64,11 +71,89 @@ export default function MessageBubble({
 
   const hasImage = message.attachment_type === 'image' && message.attachment_url;
   const hasVideo = message.attachment_type === 'video' && message.attachment_url;
+  const audioByName = /\.(m4a|aac|mp3|wav|ogg|webm)$/i.test(
+    `${message.attachment_name || ''} ${message.attachment_url || ''}`
+  );
+  const hasAudio =
+    (message.attachment_type === 'audio' ||
+      (message.attachment_type === 'file' && audioByName)) &&
+    message.attachment_url;
   const hasFile = message.attachment_type === 'file' && message.attachment_url;
   const rawUrl = message.attachment_url || '';
   const mediaUri = (hasImage || hasVideo) && rawUrl
     ? (rawUrl.startsWith('http') ? rawUrl : `${API_BASE_URL}${rawUrl}`)
     : null;
+  const audioUri = hasAudio && rawUrl
+    ? (rawUrl.startsWith('http') ? rawUrl : `${API_BASE_URL}${rawUrl}`)
+    : null;
+  const playbackProgress = durationMillis > 0 ? positionMillis / durationMillis : 0;
+
+  const waveBars = useMemo(
+    () =>
+      Array.from({ length: 22 }, (_, idx) => {
+        const seed = message.id.charCodeAt(idx % message.id.length) || 50;
+        return 0.2 + ((seed % 10) / 10) * 0.8;
+      }),
+    [message.id]
+  );
+
+  function formatDuration(ms: number) {
+    const totalSec = Math.max(0, Math.floor(ms / 1000));
+    const mins = Math.floor(totalSec / 60);
+    const secs = totalSec % 60;
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  }
+
+  async function onPlaybackStatus(status: AVPlaybackStatus) {
+    if (!status.isLoaded) return;
+    setIsPlaying(status.isPlaying);
+    setDurationMillis(status.durationMillis || 0);
+    setPositionMillis(status.positionMillis || 0);
+    if (status.didJustFinish) {
+      setPositionMillis(0);
+      setIsPlaying(false);
+    }
+  }
+
+  async function handleToggleAudio() {
+    if (!audioUri) return;
+    try {
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        allowsRecordingIOS: false,
+      });
+
+      if (!sound) {
+        const { sound: created } = await Audio.Sound.createAsync(
+          { uri: audioUri },
+          { shouldPlay: true },
+          onPlaybackStatus
+        );
+        setSound(created);
+        return;
+      }
+      const status = await sound.getStatusAsync();
+      if (!status.isLoaded) return;
+      if (status.isPlaying) {
+        await sound.pauseAsync();
+      } else {
+        if (status.durationMillis && status.positionMillis >= status.durationMillis - 200) {
+          await sound.setPositionAsync(0);
+        }
+        await sound.playAsync();
+      }
+    } catch (err) {
+      console.warn('[Audio] Playback error', err);
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      if (sound) {
+        sound.unloadAsync().catch(() => {});
+      }
+    };
+  }, [sound]);
 
   return (
     <>
@@ -79,7 +164,7 @@ export default function MessageBubble({
           </View>
         )}
         <View style={hasReaction ? styles.bubbleWithReaction : undefined}>
-          <TouchableOpacity activeOpacity={1} onPress={handleTap}>
+          <TouchableOpacity activeOpacity={1} onPress={handleTap} onLongPress={() => onLongPress?.(message)}>
             <View style={[styles.bubble, isMine ? styles.bubbleSent : styles.bubbleReceived]}>
 
               {hasImage && mediaUri && (
@@ -113,6 +198,42 @@ export default function MessageBubble({
                     numberOfLines={1}
                   >
                     {message.attachment_name || 'Файл'}
+                  </Text>
+                </View>
+              )}
+
+              {hasAudio && audioUri && (
+                <View style={[styles.audioRow, isMine ? styles.audioRowSent : styles.audioRowReceived]}>
+                  <TouchableOpacity style={styles.audioPlayBtn} onPress={handleToggleAudio} activeOpacity={0.8}>
+                    <Ionicons
+                      name={isPlaying ? 'pause' : 'play'}
+                      size={15}
+                      color={isMine ? '#fff' : C.primary}
+                    />
+                  </TouchableOpacity>
+                  <View style={styles.audioWave}>
+                    {waveBars.map((h, idx) => (
+                      <View
+                        key={`${message.id}-${idx}`}
+                        style={[
+                          styles.audioWaveBar,
+                          {
+                            height: 6 + Math.round(h * 12),
+                            backgroundColor:
+                              idx / waveBars.length <= playbackProgress
+                                ? isMine
+                                  ? '#fff'
+                                  : C.primary
+                                : isMine
+                                  ? 'rgba(255,255,255,0.35)'
+                                  : C.border,
+                          },
+                        ]}
+                      />
+                    ))}
+                  </View>
+                  <Text style={[styles.audioDuration, isMine ? styles.timeSent : styles.timeReceived]}>
+                    {formatDuration(durationMillis || 0)}
                   </Text>
                 </View>
               )}
@@ -225,6 +346,45 @@ const createStyles = (C: ReturnType<typeof import('../hooks/useColors').useColor
     fileName: { fontSize: 14, flex: 1 },
     fileNameSent: { color: '#fff' },
     fileNameReceived: { color: C.text },
+    audioRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      minWidth: 220,
+    },
+    audioRowSent: {
+      backgroundColor: 'rgba(255,255,255,0.06)',
+    },
+    audioRowReceived: {
+      backgroundColor: 'transparent',
+    },
+    audioPlayBtn: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: 'rgba(255,255,255,0.35)',
+    },
+    audioWave: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 2,
+      height: 24,
+    },
+    audioWaveBar: {
+      width: 3,
+      borderRadius: 2,
+    },
+    audioDuration: {
+      fontSize: 11,
+      minWidth: 36,
+      textAlign: 'right',
+    },
     text: {
       fontSize: 15,
       lineHeight: 20,

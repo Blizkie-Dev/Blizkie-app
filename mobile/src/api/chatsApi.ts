@@ -11,7 +11,7 @@ export interface Message {
   created_at: number;
   deleted_at?: number | null;
   attachment_url?: string | null;
-  attachment_type?: 'image' | 'video' | 'file' | null;
+  attachment_type?: 'image' | 'video' | 'audio' | 'file' | null;
   attachment_name?: string | null;
   liked_by?: string[];
 }
@@ -60,7 +60,7 @@ export async function getMessages(
 export async function sendMessage(
   chatId: string,
   text: string,
-  attachment?: { url: string; type: 'image' | 'video' | 'file'; name?: string }
+  attachment?: { url: string; type: 'image' | 'video' | 'audio' | 'file'; name?: string }
 ): Promise<Message> {
   const res = await client.post(`/chats/${chatId}/messages`, {
     text,
@@ -75,7 +75,7 @@ export async function uploadFile(
   uri: string,
   name: string,
   mimeType: string
-): Promise<{ url: string; type: 'image' | 'video' | 'file'; name: string }> {
+): Promise<{ url: string; type: 'image' | 'video' | 'audio' | 'file'; name: string }> {
   const token = await getToken();
   const form = new FormData();
   form.append('file', { uri, name, type: mimeType } as any);
@@ -98,4 +98,8 @@ export async function reactToMessage(
 ): Promise<{ liked_by: string[] }> {
   const res = await client.post(`/chats/${chatId}/messages/${messageId}/react`);
   return res.data;
+}
+
+export async function deleteMessage(chatId: string, messageId: string): Promise<void> {
+  await client.delete(`/chats/${chatId}/messages/${messageId}`);
 }
